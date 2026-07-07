@@ -1,0 +1,43 @@
+model,case,time,lemma,type,result,steps
+secure_ms_channel,alipay_app.spthy,6.09s,typing,all-traces,verified,27
+secure_ms_channel,alipay_app.spthy,6.09s,executable,exists-trace,verified,36
+secure_ms_channel,alipay_app.spthy,6.09s,PS_MS_Order_Injective_Agreement,all-traces,falsified - found trace,10
+secure_ms_channel,alipay_app.spthy,6.09s,U_MS_Order_Injective_Agreement,all-traces,falsified - found trace,18
+secure_ms_channel,alipay_app.spthy,6.09s,MS_PS_Response_Injective_Agreement,all-traces,verified,33
+secure_ms_channel,alipay_app.spthy,6.09s,U_PS_Response_Injective_Agreement,all-traces,verified,104
+secure_ms_channel,alipay_app.spthy,6.09s,No_Payment_Without_Password_Input,all-traces,verified,53
+secure_ms_channel,alipay_mobile_web.spthy,6.06s,typing,all-traces,verified,27
+secure_ms_channel,alipay_mobile_web.spthy,6.06s,executable,exists-trace,verified,36
+secure_ms_channel,alipay_mobile_web.spthy,6.06s,PS_MS_Order_Injective_Agreement,all-traces,falsified - found trace,10
+secure_ms_channel,alipay_mobile_web.spthy,6.06s,U_MS_Order_Injective_Agreement,all-traces,falsified - found trace,18
+secure_ms_channel,alipay_mobile_web.spthy,6.06s,MS_PS_Response_Injective_Agreement,all-traces,verified,33
+secure_ms_channel,alipay_mobile_web.spthy,6.06s,U_PS_Response_Injective_Agreement,all-traces,verified,104
+secure_ms_channel,alipay_mobile_web.spthy,6.06s,No_Payment_Without_Password_Input,all-traces,verified,53
+secure_ms_channel,alipay_order_code.spthy,32.94s,typing,all-traces,verified,39
+secure_ms_channel,alipay_order_code.spthy,32.94s,executable,exists-trace,verified,42
+secure_ms_channel,alipay_order_code.spthy,32.94s,PS_MS_Order_Injective_Agreement,all-traces,verified,9
+secure_ms_channel,alipay_order_code.spthy,32.94s,U_MS_Order_Injective_Agreement,all-traces,falsified - found trace,26
+secure_ms_channel,alipay_order_code.spthy,32.94s,MS_PS_Response_Injective_Agreement,all-traces,verified,219
+secure_ms_channel,alipay_order_code.spthy,32.94s,U_PS_Response_Injective_Agreement,all-traces,verified,42
+secure_ms_channel,alipay_order_code.spthy,32.94s,No_Payment_Without_Password_Input,all-traces,verified,11
+secure_ms_channel,psp_b_pay_app.spthy,7.93s,typing,all-traces,verified,21
+secure_ms_channel,psp_b_pay_app.spthy,7.93s,executable,exists-trace,verified,32
+secure_ms_channel,psp_b_pay_app.spthy,7.93s,PS_MS_Order_Injective_Agreement,all-traces,verified,9
+secure_ms_channel,psp_b_pay_app.spthy,7.93s,U_MS_Order_Injective_Agreement,all-traces,falsified - found trace,26
+secure_ms_channel,psp_b_pay_app.spthy,7.93s,MS_PS_Response_Injective_Agreement,all-traces,verified,104
+secure_ms_channel,psp_b_pay_app.spthy,7.93s,U_PS_Response_Injective_Agreement,all-traces,verified,102
+secure_ms_channel,psp_b_pay_app.spthy,7.93s,No_Payment_Without_Password_Input,all-traces,verified,96
+secure_ms_channel,psp_b_pay_h5.spthy,3.83s,typing,all-traces,verified,14
+secure_ms_channel,psp_b_pay_h5.spthy,3.83s,executable,exists-trace,verified,32
+secure_ms_channel,psp_b_pay_h5.spthy,3.83s,PS_MS_Order_Injective_Agreement,all-traces,verified,9
+secure_ms_channel,psp_b_pay_h5.spthy,3.83s,U_MS_Order_Injective_Agreement,all-traces,falsified - found trace,22
+secure_ms_channel,psp_b_pay_h5.spthy,3.83s,MS_PS_Response_Injective_Agreement,all-traces,verified,8
+secure_ms_channel,psp_b_pay_h5.spthy,3.83s,U_PS_Response_Injective_Agreement,all-traces,verified,48
+secure_ms_channel,psp_b_pay_h5.spthy,3.83s,No_Payment_Without_Password_Input,all-traces,verified,40
+secure_ms_channel,psp_b_pay_native.spthy,3.87s,typing,all-traces,verified,14
+secure_ms_channel,psp_b_pay_native.spthy,3.87s,executable,exists-trace,verified,32
+secure_ms_channel,psp_b_pay_native.spthy,3.87s,PS_MS_Order_Injective_Agreement,all-traces,verified,9
+secure_ms_channel,psp_b_pay_native.spthy,3.87s,U_MS_Order_Injective_Agreement,all-traces,falsified - found trace,18
+secure_ms_channel,psp_b_pay_native.spthy,3.87s,MS_PS_Response_Injective_Agreement,all-traces,verified,8
+secure_ms_channel,psp_b_pay_native.spthy,3.87s,U_PS_Response_Injective_Agreement,all-traces,verified,48
+secure_ms_channel,psp_b_pay_native.spthy,3.87s,No_Payment_Without_Password_Input,all-traces,verified,40

@@ -1,0 +1,950 @@
+{
+    "base": {
+        "alipay_app.spthy": {
+            "time": "228.63s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "44"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "36"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "12"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "23"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "696"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "1686"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "383"
+                }
+            ]
+        },
+        "alipay_mobile_web.spthy": {
+            "time": "322.27s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "44"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "36"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "12"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "23"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "696"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "1686"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "383"
+                }
+            ]
+        },
+        "alipay_order_code.spthy": {
+            "time": "789.12s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "60"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "53"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "17"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "13"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "2358"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "126"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "22"
+                }
+            ]
+        },
+        "psp_b_pay_app.spthy": {
+            "time": "553.92s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "38"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "32"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "17"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "26"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "3244"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "1565"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "1513"
+                }
+            ]
+        },
+        "psp_b_pay_h5.spthy": {
+            "time": "37.52s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "25"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "32"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "17"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "16"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "16"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "234"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "202"
+                }
+            ]
+        },
+        "psp_b_pay_native.spthy": {
+            "time": "54.19s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "25"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "32"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "17"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "16"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "16"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "234"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "202"
+                }
+            ]
+        }
+    },
+    "countermeasures": {
+        "initial_order.spthy": {
+            "time": "519.45s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "38"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "31"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "17"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "27"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "32"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "7367"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "7321"
+                }
+            ]
+        },
+        "regular_order.spthy": {
+            "time": "1247.44s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "38"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "29"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "17"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "8897"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "18260"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "9027"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "8981"
+                }
+            ]
+        }
+    },
+    "secure_ms_channel": {
+        "alipay_app.spthy": {
+            "time": "6.09s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "27"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "36"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "10"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "18"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "33"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "104"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "53"
+                }
+            ]
+        },
+        "alipay_mobile_web.spthy": {
+            "time": "6.06s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "27"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "36"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "10"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "18"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "33"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "104"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "53"
+                }
+            ]
+        },
+        "alipay_order_code.spthy": {
+            "time": "32.94s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "39"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "42"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "9"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "26"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "219"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "42"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "11"
+                }
+            ]
+        },
+        "psp_b_pay_app.spthy": {
+            "time": "7.93s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "21"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "32"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "9"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "26"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "104"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "102"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "96"
+                }
+            ]
+        },
+        "psp_b_pay_h5.spthy": {
+            "time": "3.83s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "14"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "32"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "9"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "22"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "8"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "48"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "40"
+                }
+            ]
+        },
+        "psp_b_pay_native.spthy": {
+            "time": "3.87s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "14"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "32"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "9"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "18"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "8"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "48"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "40"
+                }
+            ]
+        }
+    },
+    "secure_ps_channel": {
+        "alipay_app.spthy": {
+            "time": "9.20s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "34"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "36"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "12"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "19"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "110"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "128"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "79"
+                }
+            ]
+        },
+        "alipay_mobile_web.spthy": {
+            "time": "10.41s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "34"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "36"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "12"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "19"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "110"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "128"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "79"
+                }
+            ]
+        },
+        "alipay_order_code.spthy": {
+            "time": "95.96s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "46"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "52"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "14"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "16"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "1848"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "56"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "14"
+                }
+            ]
+        },
+        "psp_b_pay_app.spthy": {
+            "time": "109.08s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "29"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "32"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "14"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "26"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "444"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "225"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "213"
+                }
+            ]
+        },
+        "psp_b_pay_h5.spthy": {
+            "time": "12.21s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "17"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "32"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "14"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "21"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "10"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "86"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "72"
+                }
+            ]
+        },
+        "psp_b_pay_native.spthy": {
+            "time": "16.76s",
+            "lemmas": [
+                {
+                    "name": "typing",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "17"
+                },
+                {
+                    "name": "executable",
+                    "type": "exists-trace",
+                    "result": "verified",
+                    "steps": "32"
+                },
+                {
+                    "name": "PS_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "14"
+                },
+                {
+                    "name": "U_MS_Order_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "falsified - found trace",
+                    "steps": "19"
+                },
+                {
+                    "name": "MS_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "10"
+                },
+                {
+                    "name": "U_PS_Response_Injective_Agreement",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "86"
+                },
+                {
+                    "name": "No_Payment_Without_Password_Input",
+                    "type": "all-traces",
+                    "result": "verified",
+                    "steps": "72"
+                }
+            ]
+        }
+    }
+}

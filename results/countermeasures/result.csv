@@ -1,0 +1,15 @@
+model,case,time,lemma,type,result,steps
+countermeasures,initial_order.spthy,519.45s,typing,all-traces,verified,38
+countermeasures,initial_order.spthy,519.45s,executable,exists-trace,verified,31
+countermeasures,initial_order.spthy,519.45s,PS_MS_Order_Injective_Agreement,all-traces,verified,17
+countermeasures,initial_order.spthy,519.45s,U_MS_Order_Injective_Agreement,all-traces,falsified - found trace,27
+countermeasures,initial_order.spthy,519.45s,MS_PS_Response_Injective_Agreement,all-traces,verified,32
+countermeasures,initial_order.spthy,519.45s,U_PS_Response_Injective_Agreement,all-traces,verified,7367
+countermeasures,initial_order.spthy,519.45s,No_Payment_Without_Password_Input,all-traces,verified,7321
+countermeasures,regular_order.spthy,1247.44s,typing,all-traces,verified,38
+countermeasures,regular_order.spthy,1247.44s,executable,exists-trace,verified,29
+countermeasures,regular_order.spthy,1247.44s,PS_MS_Order_Injective_Agreement,all-traces,verified,17
+countermeasures,regular_order.spthy,1247.44s,U_MS_Order_Injective_Agreement,all-traces,verified,8897
+countermeasures,regular_order.spthy,1247.44s,MS_PS_Response_Injective_Agreement,all-traces,verified,18260
+countermeasures,regular_order.spthy,1247.44s,U_PS_Response_Injective_Agreement,all-traces,verified,9027
+countermeasures,regular_order.spthy,1247.44s,No_Payment_Without_Password_Input,all-traces,verified,8981

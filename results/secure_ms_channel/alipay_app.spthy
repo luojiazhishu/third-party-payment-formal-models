@@ -1,0 +1,2421 @@
+theory Alipay_APP_Model begin
+
+// Function signature and definition of the equational theory E
+
+functions: calc_amt/1, fst/1, gen_desc/1, h/1, pair/2, pk/1, sign/2,
+           snd/1, true/0, verify/3
+equations:
+    fst(<x.1, x.2>) = x.1,
+    snd(<x.1, x.2>) = x.2,
+    verify(sign(x.1, x.2), x.1, pk(x.2)) = true
+
+tactic: default
+presort: S
+prio: {id}
+  regex".*Commit.*"
+prio: {id}
+  regex".*!KU\(.*m_sk.*"
+prio: {id}
+  regex".*m_sk.*"
+prio: {id}
+  regex".*_State.*"
+prio: {id}
+  regex".*sign.*"
+prio: {id}
+  regex".*APS_PubKey.*"
+prio: {id}
+  regex".*SOut\(.*U-.*"
+prio: {id}
+  regex".*SOut\(.*-APS.*"
+prio: {id}
+  regex".*SIn\(.*U-.*"
+prio: {id}
+  regex".*SIn\(.*-APS.*"
+
+
+tactic: typing
+presort: S
+prio: {id}
+  regex".*!KU\(\s*sign.*"
+prio: {id}
+  regex".*SOURCE_.*"
+prio: {id}
+  regex".*APS_PubKey.*"
+prio: {id}
+  regex".*SOut\(.*U-.*"
+prio: {id}
+  regex".*SOut\(.*-APS.*"
+prio: {id}
+  regex".*SIn\(.*U-.*"
+prio: {id}
+  regex".*SIn\(.*-APS.*"
+prio: {id}
+  regex".*_State.*"
+deprio: {id}
+  regex".*SOut*"
+deprio: {id}
+  regex".*SIn*"
+
+
+
+heuristic: S
+
+
+
+
+
+restriction OnlyOnceV:
+  "∀ x #i #j. ((OnlyOnceV( x ) @ #i) ∧ (OnlyOnceV( x ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction Equality:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  // safety formula
+
+restriction Inequality:
+  "∀ x #i. (Neq( x, x ) @ #i) ⇒ (⊥)"
+  // safety formula
+
+restriction InsecureChannel:
+  "∀ ch_id #i. (InsecureChannel( ch_id ) @ #i) ⇒ (ch_id = 'MA-APA')"
+  // safety formula
+
+rule (modulo E) SecureChannelSendRecv[color=#f0f5e5]:
+   [ SOut( ch_id, ~session, $src, $dst, msg ) ]
+  --[ Neq( $src, $dst ) ]->
+   [ SIn( ch_id, ~session, $src, $dst, msg ) ]
+
+  // loop breaker: [0]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) breakChannelConfidentiality[color=#fccb16]:
+   [ SOut( ch_id, ~session, $src, $dst, msg ) ]
+  --[
+  OnlyOnceV( <$src, $dst, msg> ), BreakChannelCon( ch_id ),
+  InsecureChannel( ch_id ),
+  SOURCE_IN_FACT_BkChaCon( ch_id, ~session, $src, $dst, msg )
+  ]->
+   [ SOut( ch_id, ~session, $src, $dst, msg ), Out( <$src, $dst, msg> ) ]
+
+  // loop breaker: [0]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) breakChannelIntegrity[color=#f25a47]:
+   [ In( <ch_id, ~session, $src, $dst, msg> ) ]
+  --[
+  BreakChannelInt( ch_id ), InsecureChannel( ch_id ),
+  SOURCE_OUT_FACT_BkChaInt( ch_id, ~session, $src, $dst, msg )
+  ]->
+   [ SIn( ch_id, ~session, $src, $dst, msg ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) OrderCreateOracle[color=#f9d27d]:
+   [
+   Fr( ~out_trade_no ), In( <total_amount, subject> ),
+   !MerchantCreated( <$ms_id, ~app_id, $notify_url, ~m_sk> )
+   ]
+  -->
+   [
+   Out( <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, 
+         sign(<~app_id, <~out_trade_no, total_amount, subject>, $notify_url>,
+              ~m_sk)
+        >
+   ),
+   !MS_Database( $ms_id, $attacker, <~out_trade_no, total_amount, subject>,
+                 ~out_trade_no
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) PaymentQueryOracle[color=#f9d27d]:
+   [
+   In( <~out_trade_no, total_amount, subject> ),
+   !APS_Database( $aps_id, <~out_trade_no, total_amount, subject>,
+                  ~out_trade_no
+   )
+   ]
+  -->
+   [ Out( <total_amount, subject> ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) CreateAPS[color=#d3c3f3]:
+   [ Fr( ~a_sk ) ]
+  --[ OnlyOnceV( 'APS' ) ]->
+   [ !APS_PriKey( ~a_sk ), !APS_PubKey( pk(~a_sk) ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) CreateAPA[color=#c4c3f3]:
+   [ ]
+  --[ OnlyOnceV( <'APA', $apa_id> ) ]->
+   [ APA_State( 'created', 'null', $apa_id ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) CreateMA[color=#f3c3c7]:
+   [ ]
+  --[ OnlyOnceV( <'MA', $ma_id> ) ]->
+   [ MA_State( 'created', 'null', $ma_id ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) CreateU[color=#c5f3c3]:
+   [ Fr( ~password ) ]
+  --[ OnlyOnceV( 'U' ) ]->
+   [
+   !UserRegistered( <$u_id, h(~password)> ),
+   !UserPassword( <$u_id, ~password> )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) CreateMS[color=#f3ccc3]:
+   [ Fr( ~app_id ), Fr( ~m_sk ) ]
+  --[ OnlyOnceV( <'MS', $ms_id> ) ]->
+   [
+   !MerchantRegistered( <$ms_id, ~app_id, pk(~m_sk)> ),
+   !MerchantCreated( <$ms_id, ~app_id, $notify_url, ~m_sk> )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) NewPaymentSession[color=#d0deaa]:
+   [
+   Fr( ~session ), !APS_PriKey( ~a_sk ),
+   !UserPassword( <$u_id, ~password> ),
+   !MerchantCreated( <$ms_id, ~app_id, $notify_url, ~m_sk> ),
+   MA_State( 'created', 'null', $ma_id ),
+   APA_State( 'created', 'null', $apa_id )
+   ]
+  --[ Start( ~session, $u_id, $ma_id, $ms_id, $apa_id, $aps_id ) ]->
+   [
+   U_State( 'init', ~session,
+            <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password>
+   ),
+   MA_State( 'init', ~session, <$ma_id, $u_id, $ms_id, $apa_id> ),
+   MS_State( 'init', ~session,
+             <$ms_id, $notify_url, $ma_id, $u_id, $apa_id, $aps_id, ~app_id, ~m_sk>
+   ),
+   APA_State( 'init', ~session, <$apa_id, $u_id, $ma_id, $ms_id, $aps_id> ),
+   APS_State( 'init', ~session, <$aps_id, $apa_id, $ms_id, ~a_sk> ),
+   Out( ~session )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) UOpenAndOrderMA[role="U"]:
+   [
+   Fr( ~goods ),
+   U_State( 'init', ~session,
+            <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password>
+   )
+   ]
+  -->
+   [
+   U_State( 'ordered', ~session,
+            <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password, ~goods>
+   ),
+   SOut( 'U-MA', ~session, $u_id, $ma_id, <'OpenAppAndOrder', ~goods> )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) MAOrderMS[role="MA"]:
+   [
+   SIn( 'U-MA', ~session, $u_id, $ma_id, <'OpenAppAndOrder', ~goods> ),
+   MA_State( 'init', ~session, <$ma_id, $u_id, $ms_id, $apa_id> )
+   ]
+  --[ SOURCE_OUT_FACT_BkChaCon( 'MA-MS', ~session, $ma_id, $ms_id, ~goods )
+  ]->
+   [
+   SOut( 'MA-MS', ~session, $ma_id, $ms_id, ~goods ),
+   MA_State( 'ordered', ~session, <$ma_id, $u_id, $ms_id, $apa_id, ~goods> )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) MSProcessOrderMA[role="MS"]:
+   [
+   SIn( 'MA-MS', ~session, $ma_id, $ms_id, ~goods ),
+   MS_State( 'init', ~session,
+             <$ms_id, $notify_url, $ma_id, $u_id, $apa_id, $aps_id, ~app_id, ~m_sk>
+   ),
+   Fr( ~out_trade_no )
+   ]
+  --[
+  SOURCE_OUT_FACT_BkChaCon( 'MA-MS', ~session, $ms_id, $ma_id,
+                            <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                             $notify_url, 
+                             sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                                   $notify_url>,
+                                  ~m_sk)
+                            >
+  ),
+  SOURCE_OUT_FACT_M_SIGN( 'MA-MS', ~session, $ms_id, $ma_id,
+                          <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                           $notify_url, 
+                           sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                                 $notify_url>,
+                                ~m_sk)
+                          >
+  ),
+  MS_Running( 'PSAuthMS', $ms_id, $aps_id,
+              <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+               $notify_url, 
+               sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                     $notify_url>,
+                    ~m_sk)
+              >
+  ),
+  MS_Running( 'UAuthMS', $ms_id, $u_id, ~out_trade_no )
+  ]->
+   [
+   SOut( 'MA-MS', ~session, $ms_id, $ma_id,
+         <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+          $notify_url, 
+          sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                $notify_url>,
+               ~m_sk)
+         >
+   ),
+   !MS_Database( $ms_id, $u_id,
+                 <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, ~out_trade_no
+   ),
+   MS_State( 'OrderProcessed', ~session,
+             <$ms_id, $notify_url, $ma_id, $u_id, $apa_id, $aps_id, ~app_id, ~m_sk>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) MACallAPA[role="MA"]:
+   [
+   SIn( 'MA-MS', ~session, $ms_id, $ma_id,
+        <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+   ),
+   MA_State( 'ordered', ~session, <$ma_id, $u_id, $ms_id, $apa_id, ~goods> )
+   ]
+  --[
+  SOURCE_OUT_FACT_BkChaCon( 'MA-APA', ~session, $ma_id, $apa_id,
+                            <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+  ),
+  SOURCE_IN_FACT_M_SIGN( 'MA-MS', ~session, $ms_id, $ma_id,
+                         <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+  ),
+  Finish( 'MA', ~session, $ma_id )
+  ]->
+   [
+   SOut( 'MA-APA', ~session, $ma_id, $apa_id,
+         <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+   ),
+   MA_State( 'called', ~session,
+             <$ma_id, $u_id, $ms_id, $apa_id, ~app_id, 
+              <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) APASendPaymentAPS[role="APA"]:
+   [
+   SIn( 'MA-APA', ~session, $ma_id, $apa_id,
+        <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+   ),
+   APA_State( 'init', ~session, <$apa_id, $u_id, $ma_id, $ms_id, $aps_id> )
+   ]
+  -->
+   [
+   SOut( 'APA-APS', ~session, $apa_id, $aps_id,
+         <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+   ),
+   APA_State( 'paying', ~session,
+              <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, ~app_id, 
+               <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) APSVerifyPaymentAPA[role="APS"]:
+   [
+   SIn( 'APA-APS', ~session, $apa_id, $aps_id,
+        <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+   ),
+   APS_State( 'init', ~session, <$aps_id, $apa_id, $ms_id, ~a_sk> ),
+   !MerchantRegistered( <$ms_id, ~app_id, m_pk> )
+   ]
+  --[
+  Eq( verify(m_sig,
+             <~app_id, <~out_trade_no, total_amount, subject>, $notify_url>, m_pk),
+      true
+  ),
+  PS_Commit( 'PSAuthMS', $aps_id, $ms_id,
+             <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+  )
+  ]->
+   [
+   SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+         <'SReqPwd', total_amount, subject>
+   ),
+   !APS_Database( $aps_id, <~out_trade_no, total_amount, subject>,
+                  ~out_trade_no
+   ),
+   APS_State( 'waitpwd', ~session,
+              <$aps_id, $apa_id, $ms_id, ~a_sk, ~app_id, 
+               <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+   )
+   ]
+
+  /*
+  rule (modulo AC) APSVerifyPaymentAPA[role="APS"]:
+     [
+     SIn( 'APA-APS', ~session, $apa_id, $aps_id,
+          <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+     ),
+     APS_State( 'init', ~session, <$aps_id, $apa_id, $ms_id, ~a_sk> ),
+     !MerchantRegistered( <$ms_id, ~app_id, m_pk> )
+     ]
+    --[
+    Eq( z, true ),
+    PS_Commit( 'PSAuthMS', $aps_id, $ms_id,
+               <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+    )
+    ]->
+     [
+     SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+           <'SReqPwd', total_amount, subject>
+     ),
+     !APS_Database( $aps_id, <~out_trade_no, total_amount, subject>,
+                    ~out_trade_no
+     ),
+     APS_State( 'waitpwd', ~session,
+                <$aps_id, $apa_id, $ms_id, ~a_sk, ~app_id, 
+                 <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+     )
+     ]
+    variants (modulo AC)
+    1. $notify_url
+             = $notify_url.27
+       ~app_id
+             = ~app_id.29
+       ~out_trade_no
+             = ~out_trade_no.30
+       m_pk  = m_pk.32
+       m_sig = m_sig.33
+       subject
+             = subject.34
+       total_amount
+             = total_amount.35
+       z     = verify(m_sig.33,
+                      <~app_id.29, <~out_trade_no.30, total_amount.35, subject.34>, 
+                       $notify_url.27>,
+                      m_pk.32)
+    
+    2. $notify_url
+             = $notify_url.84
+       ~app_id
+             = ~app_id.86
+       ~out_trade_no
+             = ~out_trade_no.87
+       m_pk  = pk(x.163)
+       m_sig = sign(<~app_id.86, 
+                     <~out_trade_no.87, total_amount.92, subject.91>, $notify_url.84>,
+                    x.163)
+       subject
+             = subject.91
+       total_amount
+             = total_amount.92
+       z     = true
+  */
+
+rule (modulo E) APARequestUserPassword[role="APA"]:
+   [
+   SIn( 'APA-APS', ~session, $aps_id, $apa_id,
+        <'SReqPwd', total_amount, subject>
+   ),
+   APA_State( 'paying', ~session,
+              <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, ~app_id, 
+               <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+   )
+   ]
+  -->
+   [
+   SOut( 'U-APA', ~session, $apa_id, $u_id,
+         <'AReqPwd', total_amount, subject, ~out_trade_no>
+   ),
+   APA_State( 'waitpwd', ~session,
+              <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, ~app_id, 
+               <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) USubmitPasswordAPA[role="U"]:
+   [
+   U_State( 'ordered', ~session,
+            <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password, ~goods>
+   ),
+   SIn( 'U-APA', ~session, $apa_id, $u_id,
+        <'AReqPwd', calc_amt(~goods), gen_desc(~goods), ~out_trade_no>
+   )
+   ]
+  --[
+  UserInputPwd( $u_id, ~password, ~session ),
+  U_Commit( 'UAuthMS', $u_id, $ms_id, ~out_trade_no )
+  ]->
+   [
+   SOut( 'U-APA', ~session, $u_id, $apa_id, ~password ),
+   U_State( 'pwdsubmitted', ~session,
+            <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password, ~goods>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) APASubmitPasswordAPS[role="APA"]:
+   [
+   SIn( 'U-APA', ~session, $u_id, $apa_id, ~password ),
+   APA_State( 'waitpwd', ~session,
+              <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, order_str>
+   )
+   ]
+  -->
+   [
+   SOut( 'APA-APS', ~session, $apa_id, $aps_id, h(~password) ),
+   APA_State( 'pwdsubmitted', ~session,
+              <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, order_str>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) APSVerifyPasswordAndConfirmAPA[role="APS"]:
+   [
+   Fr( ~trade_no ), SIn( 'APA-APS', ~session, $apa_id, $aps_id, pwd_hash ),
+   APS_State( 'waitpwd', ~session,
+              <$aps_id, $apa_id, $ms_id, ~a_sk, ~app_id, 
+               <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+   ),
+   !UserRegistered( <$u_id, pwd_hash> )
+   ]
+  --[
+  Finish( 'APS', ~session, $aps_id ),
+  SOURCE_OUT_FACT_RES_SIGN( sign(<~app_id, ~out_trade_no, ~trade_no, 
+                                  total_amount>,
+                                 ~a_sk)
+  ),
+  PS_Running( 'MSAuthPS', $aps_id, $ms_id,
+              <~app_id, ~out_trade_no, ~trade_no, total_amount>
+  ),
+  PS_Running( 'UAuthPS', $aps_id, $u_id, <total_amount, subject> ),
+  PaymentComplete( $u_id, pwd_hash, ~session )
+  ]->
+   [
+   SOut( 'MS-APS', ~session, $aps_id, $notify_url,
+         <<~app_id, ~out_trade_no, ~trade_no, total_amount>, 
+          sign(<~app_id, ~out_trade_no, ~trade_no, total_amount>, ~a_sk)>
+   ),
+   SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+         <<~app_id, ~out_trade_no, ~trade_no, total_amount>, 
+          sign(<~app_id, ~out_trade_no, ~trade_no, total_amount>, ~a_sk)>
+   ),
+   APS_State( 'confirmed', ~session,
+              <$aps_id, $apa_id, $ms_id, ~a_sk, ~app_id, 
+               <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) MSReceiveNotification[role="MS"]:
+   [
+   !APS_PubKey( a_pk ),
+   SIn( 'MS-APS', ~session, $aps_id, $notify_url,
+        <<~app_id, ~out_trade_no, ~trade_no, total_amount>, res_sign>
+   ),
+   !MS_Database( $ms_id, $uesr, <~out_trade_no, total_amount, subject>,
+                 ~out_trade_no
+   ),
+   MS_State( 'OrderProcessed', ~session,
+             <$ms_id, $notify_url, $ma_id, $u_id, $apa_id, $aps_id, ~app_id, ~m_sk>
+   )
+   ]
+  --[
+  Eq( verify(res_sign, <~app_id, ~out_trade_no, ~trade_no, total_amount>,
+             a_pk),
+      true
+  ),
+  Finish( 'MS', ~session, $ms_id ), SOURCE_IN_FACT_RES_SIGN( res_sign ),
+  MS_Commit( 'MSAuthPS', $ms_id, $aps_id,
+             <~app_id, ~out_trade_no, ~trade_no, total_amount>
+  )
+  ]->
+   [
+   MS_State( 'completed', ~session,
+             <$ms_id, $notify_url, $ma_id, $u_id, $apa_id, $aps_id, ~app_id, ~m_sk>
+   )
+   ]
+
+  /*
+  rule (modulo AC) MSReceiveNotification[role="MS"]:
+     [
+     !APS_PubKey( a_pk ),
+     SIn( 'MS-APS', ~session, $aps_id, $notify_url,
+          <<~app_id, ~out_trade_no, ~trade_no, total_amount>, res_sign>
+     ),
+     !MS_Database( $ms_id, $uesr, <~out_trade_no, total_amount, subject>,
+                   ~out_trade_no
+     ),
+     MS_State( 'OrderProcessed', ~session,
+               <$ms_id, $notify_url, $ma_id, $u_id, $apa_id, $aps_id, ~app_id, ~m_sk>
+     )
+     ]
+    --[
+    Eq( z, true ), Finish( 'MS', ~session, $ms_id ),
+    SOURCE_IN_FACT_RES_SIGN( res_sign ),
+    MS_Commit( 'MSAuthPS', $ms_id, $aps_id,
+               <~app_id, ~out_trade_no, ~trade_no, total_amount>
+    )
+    ]->
+     [
+     MS_State( 'completed', ~session,
+               <$ms_id, $notify_url, $ma_id, $u_id, $apa_id, $aps_id, ~app_id, ~m_sk>
+     )
+     ]
+    variants (modulo AC)
+    1. ~app_id
+             = ~app_id.30
+       ~out_trade_no
+             = ~out_trade_no.32
+       ~trade_no
+             = ~trade_no.34
+       a_pk  = a_pk.35
+       res_sign
+             = res_sign.36
+       total_amount
+             = total_amount.38
+       z     = verify(res_sign.36,
+                      <~app_id.30, ~out_trade_no.32, ~trade_no.34, total_amount.38>, a_pk.35)
+    
+    2. ~app_id
+             = ~app_id.87
+       ~out_trade_no
+             = ~out_trade_no.89
+       ~trade_no
+             = ~trade_no.91
+       a_pk  = pk(x.165)
+       res_sign
+             = sign(<~app_id.87, ~out_trade_no.89, ~trade_no.91, total_amount.95>,
+                    x.165)
+       total_amount
+             = total_amount.95
+       z     = true
+  */
+
+rule (modulo E) APAReceiveConfirmationAndNotifyU[role="APA"]:
+   [
+   !APS_PubKey( a_pk ),
+   SIn( 'APA-APS', ~session, $aps_id, $apa_id,
+        <<~app_id, ~out_trade_no, ~trade_no, total_amount>, res_sign>
+   ),
+   APA_State( 'pwdsubmitted', ~session,
+              <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, ~app_id, 
+               <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+   )
+   ]
+  --[
+  Eq( verify(res_sign, <~app_id, ~out_trade_no, ~trade_no, total_amount>,
+             a_pk),
+      true
+  ),
+  Finish( 'APA', ~session, $apa_id ), SOURCE_IN_FACT_RES_SIGN( res_sign )
+  ]->
+   [
+   SOut( 'U-APA', ~session, $apa_id, $u_id,
+         <'PaymentSuccessful', total_amount, subject>
+   ),
+   APA_State( 'confirmed', ~session,
+              <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, ~app_id, 
+               <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+   )
+   ]
+
+  /*
+  rule (modulo AC) APAReceiveConfirmationAndNotifyU[role="APA"]:
+     [
+     !APS_PubKey( a_pk ),
+     SIn( 'APA-APS', ~session, $aps_id, $apa_id,
+          <<~app_id, ~out_trade_no, ~trade_no, total_amount>, res_sign>
+     ),
+     APA_State( 'pwdsubmitted', ~session,
+                <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, ~app_id, 
+                 <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+     )
+     ]
+    --[
+    Eq( z, true ), Finish( 'APA', ~session, $apa_id ),
+    SOURCE_IN_FACT_RES_SIGN( res_sign )
+    ]->
+     [
+     SOut( 'U-APA', ~session, $apa_id, $u_id,
+           <'PaymentSuccessful', total_amount, subject>
+     ),
+     APA_State( 'confirmed', ~session,
+                <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, ~app_id, 
+                 <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+     )
+     ]
+    variants (modulo AC)
+    1. ~app_id
+             = ~app_id.31
+       ~out_trade_no
+             = ~out_trade_no.32
+       ~trade_no
+             = ~trade_no.34
+       a_pk  = a_pk.35
+       res_sign
+             = res_sign.37
+       total_amount
+             = total_amount.39
+       z     = verify(res_sign.37,
+                      <~app_id.31, ~out_trade_no.32, ~trade_no.34, total_amount.39>, a_pk.35)
+    
+    2. ~app_id
+             = ~app_id.107
+       ~out_trade_no
+             = ~out_trade_no.108
+       ~trade_no
+             = ~trade_no.110
+       a_pk  = pk(x.206)
+       res_sign
+             = sign(<~app_id.107, ~out_trade_no.108, ~trade_no.110, total_amount.115>,
+                    x.206)
+       total_amount
+             = total_amount.115
+       z     = true
+  */
+
+rule (modulo E) UReceiveNotification[role="U"]:
+   [
+   U_State( 'pwdsubmitted', ~session,
+            <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password, ~goods>
+   ),
+   SIn( 'U-APA', ~session, $apa_id, $u_id,
+        <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+   )
+   ]
+  --[
+  Finish( 'U', ~session, $u_id ),
+  U_Commit( 'UAuthPS', $u_id, $aps_id, <calc_amt(~goods), gen_desc(~goods)>
+  )
+  ]->
+   [
+   U_State( 'completed', ~session,
+            <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password, ~goods>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+lemma typing [sources, heuristic={typing}]:
+  all-traces
+  "((∀ m1 m2 m3 m4 m5 #i.
+      (SOURCE_IN_FACT_BkChaCon( m1, m2, m3, m4, m5 ) @ #i) ⇒
+      (∃ #j.
+        (SOURCE_OUT_FACT_BkChaCon( m1, m2, m3, m4, m5 ) @ #j) ∧ (#j < #i))) ∧
+    (∀ m1 m2 m3 m4 m5 #i.
+      (SOURCE_IN_FACT_M_SIGN( m1, m2, m3, m4, m5 ) @ #i) ⇒
+      ((∃ #j.
+         (SOURCE_OUT_FACT_M_SIGN( m1, m2, m3, m4, m5 ) @ #j) ∧ (#j < #i)) ∨
+       (∃ #j.
+         (SOURCE_OUT_FACT_BkChaInt( m1, m2, m3, m4, m5 ) @ #j) ∧ (#j < #i))))) ∧
+   (∀ m1 #i.
+     (SOURCE_IN_FACT_RES_SIGN( m1 ) @ #i) ⇒
+     (∃ #j. (SOURCE_OUT_FACT_RES_SIGN( m1 ) @ #j) ∧ (#j < #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"((∃ m1 m2 m3 m4 m5 #i.
+    (SOURCE_IN_FACT_BkChaCon( m1, m2, m3, m4, m5 ) @ #i)
+   ∧
+    ∀ #j.
+     (SOURCE_OUT_FACT_BkChaCon( m1, m2, m3, m4, m5 ) @ #j) ⇒ ¬(#j < #i)) ∨
+  (∃ m1 m2 m3 m4 m5 #i.
+    (SOURCE_IN_FACT_M_SIGN( m1, m2, m3, m4, m5 ) @ #i)
+   ∧
+    (∀ #j.
+      (SOURCE_OUT_FACT_M_SIGN( m1, m2, m3, m4, m5 ) @ #j) ⇒ ¬(#j < #i)) ∧
+    (∀ #j.
+      (SOURCE_OUT_FACT_BkChaInt( m1, m2, m3, m4, m5 ) @ #j) ⇒ ¬(#j < #i))) ∨
+  (∃ m1 #i.
+    (SOURCE_IN_FACT_RES_SIGN( m1 ) @ #i)
+   ∧
+    ∀ #j. (SOURCE_OUT_FACT_RES_SIGN( m1 ) @ #j) ⇒ ¬(#j < #i)))"
+*/
+induction
+  case empty_trace
+  by contradiction /* from formulas */
+next
+  case non_empty_trace
+  simplify
+  solve( (∃ m1 m2 m3 m4 m5 #i.
+           (SOURCE_IN_FACT_BkChaCon( m1, m2, m3, m4, m5 ) @ #i)
+          ∧
+           ∀ #j.
+            (SOURCE_OUT_FACT_BkChaCon( m1, m2, m3, m4, m5 ) @ #j) ⇒ ¬(#j < #i))  ∥
+         (∃ m1 m2 m3 m4 m5 #i.
+           (SOURCE_IN_FACT_M_SIGN( m1, m2, m3, m4, m5 ) @ #i)
+          ∧
+           (∀ #j.
+             (SOURCE_OUT_FACT_M_SIGN( m1, m2, m3, m4, m5 ) @ #j) ⇒ ¬(#j < #i)) ∧
+           (∀ #j.
+             (SOURCE_OUT_FACT_BkChaInt( m1, m2, m3, m4, m5 ) @ #j) ⇒ ¬(#j < #i)))  ∥
+         (∃ m1 #i.
+           (SOURCE_IN_FACT_RES_SIGN( m1 ) @ #i)
+          ∧
+           ∀ #j. (SOURCE_OUT_FACT_RES_SIGN( m1 ) @ #j) ⇒ ¬(#j < #i)) )
+    case case_1
+    solve( (last(#i))  ∥
+           (∃ #j.
+             (SOURCE_OUT_FACT_BkChaCon( 'MA-APA', ~session, $src, $dst, m5 ) @ #j)
+            ∧
+             (¬(last(#j))) ∧ (#j < #i)) )
+      case case_1
+      solve( SOut( 'MA-APA', ~session, $src, $dst, m5 ) ▶₀ #i )
+        case MACallAPA
+        by contradiction /* from formulas */
+      next
+        case breakChannelConfidentiality
+        by contradiction /* cyclic */
+      qed
+    next
+      case case_2
+      by contradiction /* from formulas */
+    qed
+  next
+    case case_2
+    solve( (last(#i))  ∥
+           (∃ #j.
+             (SOURCE_OUT_FACT_M_SIGN( 'MA-MS', ~session, $ms_id, $ma_id,
+                                      <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+              ) @ #j)
+            ∧
+             (¬(last(#j))) ∧ (#j < #i))  ∥
+           (∃ #j.
+             (SOURCE_OUT_FACT_BkChaInt( 'MA-MS', ~session, $ms_id, $ma_id,
+                                        <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+              ) @ #j)
+            ∧
+             (¬(last(#j))) ∧ (#j < #i)) )
+      case case_1
+      solve( MA_State( 'ordered', ~session,
+                       <$ma_id, $u_id, $ms_id, $apa_id, ~goods>
+             ) ▶₁ #i )
+        case MAOrderMS
+        solve( SOut( 'U-MA', ~session, $u_id, $ma_id, <'OpenAppAndOrder', ~goods>
+               ) ▶₀ #vr.1 )
+          case UOpenAndOrderMA
+          solve( SIn( 'MA-MS', ~session, $ms_id, $ma_id,
+                      <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+                 ) ▶₀ #i )
+            case SecureChannelSendRecv
+            solve( SOut( 'MA-MS', ~session, $ms_id, $ma_id,
+                         <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+                   ) ▶₀ #vr.9 )
+              case MSProcessOrderMA
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      qed
+    next
+      case case_2
+      by contradiction /* from formulas */
+    qed
+  next
+    case case_3
+    solve( (last(#i))  ∥
+           (∃ #j.
+             (SOURCE_OUT_FACT_RES_SIGN( m1 ) @ #j) ∧ (¬(last(#j))) ∧ (#j < #i)) )
+      case case_1
+      solve( SOURCE_IN_FACT_RES_SIGN( m1 ) @ #i )
+        case APAReceiveConfirmationAndNotifyU
+        solve( !APS_PubKey( pk(x) ) ▶₀ #i )
+          case CreateAPS
+          solve( SIn( 'APA-APS', ~session, $aps_id, $apa_id,
+                      <<~app_id, ~out_trade_no, ~trade_no, total_amount>, 
+                       sign(<~app_id, ~out_trade_no, ~trade_no, total_amount>, ~a_sk)>
+                 ) ▶₁ #i )
+            case SecureChannelSendRecv
+            solve( SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+                         <<~app_id, ~out_trade_no, ~trade_no, total_amount>, 
+                          sign(<~app_id, ~out_trade_no, ~trade_no, total_amount>, ~a_sk)>
+                   ) ▶₀ #vr.1 )
+              case APSVerifyPasswordAndConfirmAPA
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      next
+        case MSReceiveNotification
+        solve( !APS_PubKey( pk(x) ) ▶₀ #i )
+          case CreateAPS
+          solve( SIn( 'MS-APS', ~session, $aps_id, $notify_url,
+                      <<~app_id, ~out_trade_no, ~trade_no, total_amount>, 
+                       sign(<~app_id, ~out_trade_no, ~trade_no, total_amount>, ~a_sk)>
+                 ) ▶₁ #i )
+            case SecureChannelSendRecv
+            solve( SOut( 'MS-APS', ~session, $aps_id, $notify_url,
+                         <<~app_id, ~out_trade_no, ~trade_no, total_amount>, 
+                          sign(<~app_id, ~out_trade_no, ~trade_no, total_amount>, ~a_sk)>
+                   ) ▶₀ #vr.1 )
+              case APSVerifyPasswordAndConfirmAPA
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      qed
+    next
+      case case_2
+      by contradiction /* from formulas */
+    qed
+  qed
+qed
+
+lemma executable [heuristic={default}]:
+  exists-trace
+  "∃ session u_id ma_id ms_id apa_id aps_id #i #j #k #l #m #n.
+    (((((Start( session, u_id, ma_id, ms_id, apa_id, aps_id ) @ #n) ∧
+        (Finish( 'U', session, u_id ) @ #i)) ∧
+       (Finish( 'MA', session, ma_id ) @ #j)) ∧
+      (Finish( 'MS', session, ms_id ) @ #k)) ∧
+     (Finish( 'APA', session, apa_id ) @ #l)) ∧
+    (Finish( 'APS', session, aps_id ) @ #m)"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ session u_id ma_id ms_id apa_id aps_id #i #j #k #l #m #n.
+  (Start( session, u_id, ma_id, ms_id, apa_id, aps_id ) @ #n) ∧
+  (Finish( 'U', session, u_id ) @ #i) ∧
+  (Finish( 'MA', session, ma_id ) @ #j) ∧
+  (Finish( 'MS', session, ms_id ) @ #k) ∧
+  (Finish( 'APA', session, apa_id ) @ #l) ∧
+  (Finish( 'APS', session, aps_id ) @ #m)"
+*/
+simplify
+solve( !MerchantCreated( <$ms_id, ~app_id, $notify_url, ~m_sk> ) ▶₃ #n )
+  case CreateMS
+  solve( MA_State( 'created', 'null', $ma_id ) ▶₄ #n )
+    case CreateMA
+    solve( APA_State( 'created', 'null', $apa_id ) ▶₅ #n )
+      case CreateAPA
+      solve( !APS_PriKey( ~a_sk ) ▶₁ #n )
+        case CreateAPS
+        solve( !UserPassword( <$u_id, ~password> ) ▶₂ #n )
+          case CreateU
+          solve( Finish( 'U', ~session, $u_id ) @ #i )
+            case UReceiveNotification
+            solve( U_State( 'pwdsubmitted', ~session,
+                            <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password, ~goods>
+                   ) ▶₀ #i )
+              case USubmitPasswordAPA
+              solve( SOut( 'U-APA', ~session, $apa_id, $u_id,
+                           <'AReqPwd', calc_amt(~goods), gen_desc(~goods), ~out_trade_no>
+                     ) ▶₀ #vr.7 )
+                case APARequestUserPassword_case_1
+                solve( SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+                             <'SReqPwd', calc_amt(~goods), gen_desc(~goods)>
+                       ) ▶₀ #vr.9 )
+                  case APSVerifyPaymentAPA
+                  solve( SOut( 'APA-APS', ~session, $apa_id, $aps_id,
+                               <~app_id, <~out_trade_no.1, calc_amt(~goods), gen_desc(~goods)>, 
+                                $notify_url.2, 
+                                sign(<~app_id, <~out_trade_no.1, calc_amt(~goods), gen_desc(~goods)>, 
+                                      $notify_url.2>,
+                                     ~m_sk)
+                               >
+                         ) ▶₀ #vr.13 )
+                    case APASendPaymentAPS
+                    solve( SOut( 'MA-APA', ~session, $ma_id, $apa_id,
+                                 <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                                  $notify_url.1, 
+                                  sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                                        $notify_url.1>,
+                                       ~m_sk)
+                                 >
+                           ) ▶₀ #vr.11 )
+                      case MACallAPA
+                      solve( SOut( 'MA-MS', ~session, $ms_id, $ma_id,
+                                   <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                                    $notify_url.1, 
+                                    sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                                          $notify_url.1>,
+                                         ~m_sk)
+                                   >
+                             ) ▶₀ #vr.15 )
+                        case MSProcessOrderMA
+                        solve( SOut( 'U-MA', ~session, $u_id, $ma_id,
+                                     <'OpenAppAndOrder', ~goods.1>
+                               ) ▶₀ #vr.17 )
+                          case UOpenAndOrderMA
+                          solve( SIn( 'U-APA', ~session, $apa_id, $u_id,
+                                      <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                                 ) ▶₁ #i )
+                            case SecureChannelSendRecv
+                            solve( SOut( 'U-APA', ~session, $apa_id, $u_id,
+                                         <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                                   ) ▶₀ #vr.20 )
+                              case APAReceiveConfirmationAndNotifyU
+                              solve( SOut( 'APA-APS', ~session.1, $apa_id.1, $aps_id.1,
+                                           <~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                            $notify_url.1, 
+                                            sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                                  $notify_url.1>,
+                                                 ~m_sk)
+                                           >
+                                     ) ▶₀ #vr.27 )
+                                case APASendPaymentAPS_case_1
+                                solve( SOut( 'MA-APA', ~session.1, $ma_id.1, $apa_id.1,
+                                             <~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                              $notify_url, 
+                                              sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                                    $notify_url>,
+                                                   ~m_sk)
+                                             >
+                                       ) ▶₀ #vr.32 )
+                                  case MACallAPA
+                                  solve( SOut( 'MA-MS', ~session.1, $ms_id, $ma_id.1,
+                                               <~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                                $notify_url, 
+                                                sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                                      $notify_url>,
+                                                     ~m_sk)
+                                               >
+                                         ) ▶₀ #vr.34 )
+                                    case MSProcessOrderMA
+                                    solve( SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+                                                 <<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, 
+                                                  sign(<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>,
+                                                       ~a_sk)
+                                                 >
+                                           ) ▶₀ #vr.22 )
+                                      case APSVerifyPasswordAndConfirmAPA
+                                      solve( SOut( 'U-APA', ~session, $u_id, $apa_id, ~password.1
+                                             ) ▶₀ #vr.24 )
+                                        case USubmitPasswordAPA
+                                        solve( SOut( 'APA-APS', ~session, $apa_id, $aps_id, h(~password)
+                                               ) ▶₀ #vr.25 )
+                                          case APASubmitPasswordAPS
+                                          solve( Finish( 'MA', ~session, $ma_id ) @ #j.1 )
+                                            case MACallAPA
+                                            solve( MA_State( 'ordered', ~session,
+                                                             <$ma_id, $u_id.1, $ms_id.1, $apa_id.1, ~goods.1>
+                                                   ) ▶₁ #j.1 )
+                                              case MAOrderMS
+                                              solve( Finish( 'MS', ~session, $ms_id ) @ #k )
+                                                case MSReceiveNotification
+                                                solve( MS_State( 'OrderProcessed', ~session,
+                                                                 <$ms_id, $notify_url.1, $ma_id.1, $u_id.1, 
+                                                                  $apa_id.1, $aps_id.1, ~app_id.1, ~m_sk.1>
+                                                       ) ▶₃ #k )
+                                                  case MSProcessOrderMA
+                                                  solve( SIn( 'MS-APS', ~session, $aps_id, $notify_url,
+                                                              <
+                                                               <~app_id, ~out_trade_no.1, ~trade_no.1, 
+                                                                total_amount>, 
+                                                               sign(<~app_id, ~out_trade_no.1, ~trade_no.1, 
+                                                                     total_amount>,
+                                                                    x)
+                                                              >
+                                                         ) ▶₁ #k )
+                                                    case SecureChannelSendRecv
+                                                    solve( SOut( 'MS-APS', ~session, $aps_id, $notify_url,
+                                                                 <
+                                                                  <~app_id, ~out_trade_no.1, ~trade_no.1, 
+                                                                   total_amount>, 
+                                                                  sign(<~app_id, ~out_trade_no.1, 
+                                                                        ~trade_no.1, total_amount>,
+                                                                       x)
+                                                                 >
+                                                           ) ▶₀ #vr.25 )
+                                                      case APSVerifyPasswordAndConfirmAPA
+                                                      solve( !APS_PubKey( pk(~a_sk) ) ▶₀ #k )
+                                                        case CreateAPS
+                                                        solve( !MS_Database( $ms_id, $uesr,
+                                                                             <~out_trade_no, 
+                                                                              calc_amt(~goods), subject>,
+                                                                             ~out_trade_no
+                                                               ) ▶₂ #k )
+                                                          case MSProcessOrderMA
+                                                          solve( Finish( 'APA', ~session, $apa_id ) @ #l )
+                                                            case APAReceiveConfirmationAndNotifyU
+                                                            solve( APA_State( 'pwdsubmitted', ~session,
+                                                                              <$apa_id, $u_id.1, $ma_id.1, 
+                                                                               $ms_id.1, $aps_id.1, 
+                                                                               ~app_id.1, 
+                                                                               <~out_trade_no.1, 
+                                                                                total_amount, subject>, 
+                                                                               $notify_url.1, m_sig>
+                                                                   ) ▶₂ #l )
+                                                              case APASubmitPasswordAPS
+                                                              solve( Finish( 'APS', ~session, $aps_id ) @ #m )
+                                                                case APSVerifyPasswordAndConfirmAPA
+                                                                solve( APS_State( 'waitpwd', ~session,
+                                                                                  <$aps_id, $apa_id.1, 
+                                                                                   $ms_id.1, ~a_sk.1, 
+                                                                                   ~app_id.1, 
+                                                                                   <~out_trade_no.1, 
+                                                                                    total_amount, subject>, 
+                                                                                   $notify_url.1, m_sig>
+                                                                       ) ▶₂ #m )
+                                                                  case APSVerifyPaymentAPA
+                                                                  solve( SOut( 'MA-MS', ~session, $ma_id,
+                                                                               $ms_id, ~goods
+                                                                         ) ▶₀ #vr.18 )
+                                                                    case MAOrderMS
+                                                                    SOLVED // trace found
+                                                                  qed
+                                                                qed
+                                                              qed
+                                                            qed
+                                                          qed
+                                                        qed
+                                                      qed
+                                                    qed
+                                                  qed
+                                                qed
+                                              qed
+                                            qed
+                                          qed
+                                        qed
+                                      qed
+                                    qed
+                                  qed
+                                qed
+                              qed
+                            qed
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma PS_MS_Order_Injective_Agreement [heuristic={default}]:
+  all-traces
+  "∀ ps ms o #i.
+    (PS_Commit( 'PSAuthMS', ps, ms, o ) @ #i) ⇒
+    (∃ #j.
+      ((MS_Running( 'PSAuthMS', ms, ps, o ) @ #j) ∧ (#j < #i)) ∧
+      (¬(∃ ps2 ms2 #i2.
+          (PS_Commit( 'PSAuthMS', ps2, ms2, o ) @ #i2) ∧ (¬(#i2 = #i)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ps ms o #i.
+  (PS_Commit( 'PSAuthMS', ps, ms, o ) @ #i)
+ ∧
+  ∀ #j.
+   (MS_Running( 'PSAuthMS', ms, ps, o ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨
+    (∃ ps2 ms2 #i2.
+      (PS_Commit( 'PSAuthMS', ps2, ms2, o ) @ #i2) ∧ ¬(#i2 = #i)))"
+*/
+simplify
+solve( APS_State( 'init', ~session, <$aps_id, $apa_id, $ms_id, ~a_sk>
+       ) ▶₁ #i )
+  case NewPaymentSession
+  solve( SIn( 'APA-APS', ~session, $apa_id, $aps_id,
+              <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, 
+               sign(<~app_id, <~out_trade_no, total_amount, subject>, $notify_url>, x)>
+         ) ▶₀ #i )
+    case SecureChannelSendRecv
+    solve( SOut( 'APA-APS', ~session, $apa_id, $aps_id,
+                 <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, 
+                  sign(<~app_id, <~out_trade_no, total_amount, subject>, $notify_url>, x)>
+           ) ▶₀ #vr.6 )
+      case APASendPaymentAPS_case_2
+      solve( !KU( sign(<~app_id, <~out_trade_no, total_amount, subject>, 
+                        $notify_url>,
+                       x)
+             ) @ #vk.18 )
+        case OrderCreateOracle
+        solve( !MerchantRegistered( <$ms_id, ~app_id, pk(~m_sk)> ) ▶₂ #i )
+          case CreateMS
+          solve( !KU( ~session ) @ #vk.6 )
+            case NewPaymentSession
+            solve( !KU( ~app_id ) @ #vk.12 )
+              case OrderCreateOracle
+              solve( !KU( ~out_trade_no ) @ #vk.14 )
+                case OrderCreateOracle
+                SOLVED // trace found
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma U_MS_Order_Injective_Agreement [heuristic={default}]:
+  all-traces
+  "∀ u ms o #i.
+    (U_Commit( 'UAuthMS', u, ms, o ) @ #i) ⇒
+    (∃ #j.
+      ((MS_Running( 'UAuthMS', ms, u, o ) @ #j) ∧ (#j < #i)) ∧
+      (¬(∃ u2 ms2 #i2.
+          (U_Commit( 'UAuthMS', u2, ms2, o ) @ #i2) ∧ (¬(#i2 = #i)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ u ms o #i.
+  (U_Commit( 'UAuthMS', u, ms, o ) @ #i)
+ ∧
+  ∀ #j.
+   (MS_Running( 'UAuthMS', ms, u, o ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨
+    (∃ u2 ms2 #i2. (U_Commit( 'UAuthMS', u2, ms2, o ) @ #i2) ∧ ¬(#i2 = #i)))"
+*/
+simplify
+solve( U_Commit( 'UAuthMS', u, ms, o ) @ #i )
+  case USubmitPasswordAPA
+  solve( U_State( 'ordered', ~session,
+                  <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password, ~goods>
+         ) ▶₀ #i )
+    case UOpenAndOrderMA
+    solve( SIn( 'U-APA', ~session, $apa_id, $u_id,
+                <'AReqPwd', calc_amt(~goods), gen_desc(~goods), ~out_trade_no>
+           ) ▶₁ #i )
+      case SecureChannelSendRecv
+      solve( SOut( 'U-APA', ~session, $apa_id, $u_id,
+                   <'AReqPwd', calc_amt(~goods), gen_desc(~goods), ~out_trade_no>
+             ) ▶₀ #vr.7 )
+        case APARequestUserPassword_case_2
+        solve( SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+                     <'SReqPwd', calc_amt(~goods), gen_desc(~goods)>
+               ) ▶₀ #vr.9 )
+          case APSVerifyPaymentAPA
+          solve( SOut( 'APA-APS', ~session, $apa_id, $aps_id,
+                       <~app_id, <~out_trade_no.1, calc_amt(~goods), gen_desc(~goods)>, 
+                        $notify_url.2, 
+                        sign(<~app_id, <~out_trade_no.1, calc_amt(~goods), gen_desc(~goods)>, 
+                              $notify_url.2>,
+                             ~m_sk)
+                       >
+                 ) ▶₀ #vr.13 )
+            case APASendPaymentAPS
+            solve( !KU( sign(<~app_id, 
+                              <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, $notify_url.1>,
+                             ~m_sk)
+                   ) @ #vk.18 )
+              case OrderCreateOracle
+              solve( !KU( calc_amt(~goods) ) @ #vk.15 )
+                case breakChannelConfidentiality
+                solve( SOut( 'MA-APA', ~session.1, $src, $dst,
+                             <~app_id.1, <~out_trade_no.1, calc_amt(~goods), gen_desc(~goods)>, 
+                              $notify_url.1, 
+                              sign(<~app_id.1, <~out_trade_no.1, calc_amt(~goods), gen_desc(~goods)>, 
+                                    $notify_url.1>,
+                                   ~m_sk.1)
+                             >
+                       ) ▶₀ #vr.18 )
+                  case MACallAPA
+                  solve( SOut( 'MA-MS', ~session.1, $ms_id.1, $src,
+                               <~app_id, <~out_trade_no.1, calc_amt(~goods), gen_desc(~goods)>, 
+                                $notify_url, 
+                                sign(<~app_id, <~out_trade_no.1, calc_amt(~goods), gen_desc(~goods)>, 
+                                      $notify_url>,
+                                     ~m_sk)
+                               >
+                         ) ▶₀ #vr.25 )
+                    case MSProcessOrderMA
+                    solve( SOut( 'U-MA', ~session.1, $u_id, $src,
+                                 <'OpenAppAndOrder', ~goods.1>
+                           ) ▶₀ #vr.27 )
+                      case UOpenAndOrderMA
+                      solve( SOut( 'MA-MS', ~session.1, $src, $ms_id.1, ~goods ) ▶₀ #vr.32 )
+                        case MAOrderMS
+                        solve( !KU( ~session ) @ #vk.12 )
+                          case NewPaymentSession
+                          solve( !KU( ~app_id ) @ #vk.15 )
+                            case OrderCreateOracle
+                            solve( !KU( ~out_trade_no ) @ #vk.16 )
+                              case OrderCreateOracle
+                              solve( !KU( gen_desc(~goods) ) @ #vk.17 )
+                                case breakChannelConfidentiality
+                                SOLVED // trace found
+                              qed
+                            qed
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma MS_PS_Response_Injective_Agreement [heuristic={default}]:
+  all-traces
+  "∀ ms ps o #i.
+    (MS_Commit( 'MSAuthPS', ms, ps, o ) @ #i) ⇒
+    (∃ #j.
+      ((PS_Running( 'MSAuthPS', ps, ms, o ) @ #j) ∧ (#j < #i)) ∧
+      (¬(∃ ms2 ps2 #i2.
+          (MS_Commit( 'MSAuthPS', ms2, ps2, o ) @ #i2) ∧ (¬(#i2 = #i)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ms ps o #i.
+  (MS_Commit( 'MSAuthPS', ms, ps, o ) @ #i)
+ ∧
+  ∀ #j.
+   (PS_Running( 'MSAuthPS', ps, ms, o ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨
+    (∃ ms2 ps2 #i2.
+      (MS_Commit( 'MSAuthPS', ms2, ps2, o ) @ #i2) ∧ ¬(#i2 = #i)))"
+*/
+simplify
+solve( MS_State( 'OrderProcessed', ~session,
+                 <$ms_id, $notify_url, $ma_id, $u_id, $apa_id, $aps_id, ~app_id, ~m_sk>
+       ) ▶₃ #i )
+  case MSProcessOrderMA
+  solve( SIn( 'MS-APS', ~session, $aps_id, $notify_url,
+              <<~app_id, ~out_trade_no, ~trade_no, total_amount>, 
+               sign(<~app_id, ~out_trade_no, ~trade_no, total_amount>, x)>
+         ) ▶₁ #i )
+    case SecureChannelSendRecv
+    solve( SOut( 'MS-APS', ~session, $aps_id, $notify_url,
+                 <<~app_id, ~out_trade_no, ~trade_no, total_amount>, 
+                  sign(<~app_id, ~out_trade_no, ~trade_no, total_amount>, x)>
+           ) ▶₀ #vr.8 )
+      case APSVerifyPasswordAndConfirmAPA
+      solve( MS_State( 'OrderProcessed', ~session.1,
+                       <$ms_id.1, $notify_url.1, $ma_id.1, $u_id.1, $apa_id.1, $aps_id.1, 
+                        ~app_id, ~m_sk.1>
+             ) ▶₃ #i2 )
+        case MSProcessOrderMA
+        solve( SOut( 'APA-APS', ~session, $apa_id, $aps_id,
+                     <~app_id, <~out_trade_no, total_amount, subject.2>, $notify_url, 
+                      sign(<~app_id, <~out_trade_no, total_amount, subject.2>, $notify_url>,
+                           ~m_sk)
+                     >
+               ) ▶₀ #vr.12 )
+          case APASendPaymentAPS_case_1
+          solve( SOut( 'MA-APA', ~session, $ma_id, $apa_id,
+                       <~app_id, <~out_trade_no, total_amount, subject.2>, $notify_url, 
+                        sign(<~app_id, <~out_trade_no, total_amount, subject.2>, $notify_url>,
+                             ~m_sk)
+                       >
+                 ) ▶₀ #vr.19 )
+            case MACallAPA
+            solve( SOut( 'MA-MS', ~session, $ms_id, $ma_id,
+                         <~app_id, <~out_trade_no, total_amount, subject.2>, $notify_url, 
+                          sign(<~app_id, <~out_trade_no, total_amount, subject.2>, $notify_url>,
+                               ~m_sk)
+                         >
+                   ) ▶₀ #vr.21 )
+              case MSProcessOrderMA
+              solve( SIn( 'MS-APS', ~session.1, $aps_id.1, $notify_url,
+                          <<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, 
+                           sign(<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, x)>
+                     ) ▶₁ #i2 )
+                case SecureChannelSendRecv
+                solve( SOut( 'MS-APS', ~session.1, $aps_id.1, $notify_url,
+                             <<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, 
+                              sign(<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, x)>
+                       ) ▶₀ #vr.24 )
+                  case APSVerifyPasswordAndConfirmAPA
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          next
+            case breakChannelConfidentiality
+            solve( SOut( 'MA-APA', ~session, $ma_id, $apa_id,
+                         <~app_id, <~out_trade_no, total_amount, subject.2>, $notify_url, 
+                          sign(<~app_id, <~out_trade_no, total_amount, subject.2>, $notify_url>,
+                               ~m_sk)
+                         >
+                   ) ▶₀ #vr.20 )
+              case MACallAPA
+              solve( SOut( 'MA-MS', ~session, $ms_id, $ma_id,
+                           <~app_id, <~out_trade_no, total_amount, subject.2>, $notify_url, 
+                            sign(<~app_id, <~out_trade_no, total_amount, subject.2>, $notify_url>,
+                                 ~m_sk)
+                           >
+                     ) ▶₀ #vr.21 )
+                case MSProcessOrderMA
+                solve( SIn( 'MS-APS', ~session.1, $aps_id.1, $notify_url,
+                            <<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, 
+                             sign(<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, x)>
+                       ) ▶₁ #i2 )
+                  case SecureChannelSendRecv
+                  solve( SOut( 'MS-APS', ~session.1, $aps_id.1, $notify_url,
+                               <<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, 
+                                sign(<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, x)>
+                         ) ▶₀ #vr.24 )
+                    case APSVerifyPasswordAndConfirmAPA
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          qed
+        next
+          case APASendPaymentAPS_case_2
+          solve( !KU( sign(<~app_id, <~out_trade_no, total_amount, subject.2>, 
+                            $notify_url>,
+                           ~m_sk)
+                 ) @ #vk.18 )
+            case OrderCreateOracle
+            solve( SIn( 'MS-APS', ~session.1, $aps_id.1, $notify_url,
+                        <<~app_id, ~out_trade_no, ~trade_no, total_amount>, 
+                         sign(<~app_id, ~out_trade_no, ~trade_no, total_amount>, x)>
+                   ) ▶₁ #i2 )
+              case SecureChannelSendRecv
+              solve( SOut( 'MS-APS', ~session.1, $aps_id.1, $notify_url,
+                           <<~app_id, ~out_trade_no, ~trade_no, total_amount>, 
+                            sign(<~app_id, ~out_trade_no, ~trade_no, total_amount>, x)>
+                     ) ▶₀ #vr.24 )
+                case APSVerifyPasswordAndConfirmAPA
+                by contradiction /* from formulas */
+              qed
+            qed
+          next
+            case breakChannelConfidentiality
+            solve( SOut( 'MA-APA', ~session.2, $src, $dst,
+                         <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                          $notify_url, 
+                          sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                                $notify_url>,
+                               ~m_sk)
+                         >
+                   ) ▶₀ #vr.20 )
+              case MACallAPA
+              solve( SOut( 'MA-MS', ~session.2, $ms_id, $src,
+                           <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                            $notify_url, 
+                            sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                                  $notify_url>,
+                                 ~m_sk)
+                           >
+                     ) ▶₀ #vr.26 )
+                case MSProcessOrderMA
+                solve( SIn( 'MS-APS', ~session.1, $aps_id.1, $notify_url,
+                            <<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, 
+                             sign(<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, x)>
+                       ) ▶₁ #i2 )
+                  case SecureChannelSendRecv
+                  solve( SOut( 'MS-APS', ~session.1, $aps_id.1, $notify_url,
+                               <<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, 
+                                sign(<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, x)>
+                         ) ▶₀ #vr.33 )
+                    case APSVerifyPasswordAndConfirmAPA
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            next
+              case breakChannelConfidentiality
+              by contradiction /* cyclic */
+            qed
+          next
+            case c_sign
+            solve( !KU( ~m_sk ) @ #vk.21 )
+              case breakChannelConfidentiality_case_1
+              solve( SOut( 'MA-APA', ~session.2, $src, $dst,
+                           <~m_sk, <~out_trade_no.3, total_amount.1, subject.3>, $notify_url.1, 
+                            m_sig>
+                     ) ▶₀ #vr.20 )
+                case MACallAPA
+                by solve( SOut( 'MA-MS', ~session.2, $ms_id.1, $src,
+                                <~m_sk, <~out_trade_no.1, total_amount.1, subject.2>, $notify_url.1, 
+                                 m_sig>
+                          ) ▶₀ #vr.24 )
+              next
+                case breakChannelConfidentiality
+                by contradiction /* cyclic */
+              qed
+            next
+              case breakChannelConfidentiality_case_2
+              solve( SOut( 'MA-APA', ~session.2, $src, $dst,
+                           <~app_id.1, <~m_sk, total_amount.1, subject.3>, $notify_url.1, m_sig>
+                     ) ▶₀ #vr.20 )
+                case MACallAPA
+                by solve( SOut( 'MA-MS', ~session.2, $ms_id.1, $src,
+                                <~app_id.1, <~m_sk, total_amount.1, subject.2>, $notify_url.1, m_sig>
+                          ) ▶₀ #vr.26 )
+              next
+                case breakChannelConfidentiality
+                by contradiction /* cyclic */
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma U_PS_Response_Injective_Agreement [heuristic={default}]:
+  all-traces
+  "∀ u pa r #i.
+    (U_Commit( 'UAuthPS', u, pa, r ) @ #i) ⇒
+    (∃ #j.
+      ((PS_Running( 'UAuthPS', pa, u, r ) @ #j) ∧ (#j < #i)) ∧
+      (¬(∃ u2 pa2 #i2.
+          (U_Commit( 'UAuthPS', u2, pa2, r ) @ #i2) ∧ (¬(#i2 = #i)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ u pa r #i.
+  (U_Commit( 'UAuthPS', u, pa, r ) @ #i)
+ ∧
+  ∀ #j.
+   (PS_Running( 'UAuthPS', pa, u, r ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨
+    (∃ u2 pa2 #i2. (U_Commit( 'UAuthPS', u2, pa2, r ) @ #i2) ∧ ¬(#i2 = #i)))"
+*/
+simplify
+solve( U_Commit( 'UAuthPS', u, pa, r ) @ #i )
+  case UReceiveNotification
+  solve( U_State( 'pwdsubmitted', ~session,
+                  <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password, ~goods>
+         ) ▶₀ #i )
+    case USubmitPasswordAPA
+    solve( SOut( 'U-APA', ~session, $apa_id, $u_id,
+                 <'AReqPwd', calc_amt(~goods), gen_desc(~goods), ~out_trade_no>
+           ) ▶₀ #vr.2 )
+      case APARequestUserPassword_case_1
+      solve( SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+                   <'SReqPwd', calc_amt(~goods), gen_desc(~goods)>
+             ) ▶₀ #vr.10 )
+        case APSVerifyPaymentAPA
+        solve( SOut( 'APA-APS', ~session, $apa_id, $aps_id,
+                     <~app_id, <~out_trade_no.1, calc_amt(~goods), gen_desc(~goods)>, 
+                      $notify_url.2, 
+                      sign(<~app_id, <~out_trade_no.1, calc_amt(~goods), gen_desc(~goods)>, 
+                            $notify_url.2>,
+                           ~m_sk)
+                     >
+               ) ▶₀ #vr.14 )
+          case APASendPaymentAPS
+          solve( SOut( 'MA-APA', ~session, $ma_id, $apa_id,
+                       <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                        $notify_url.1, 
+                        sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                              $notify_url.1>,
+                             ~m_sk)
+                       >
+                 ) ▶₀ #vr.12 )
+            case MACallAPA
+            solve( SOut( 'MA-MS', ~session, $ms_id, $ma_id,
+                         <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                          $notify_url.1, 
+                          sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                                $notify_url.1>,
+                               ~m_sk)
+                         >
+                   ) ▶₀ #vr.16 )
+              case MSProcessOrderMA
+              solve( SOut( 'U-MA', ~session, $u_id, $ma_id,
+                           <'OpenAppAndOrder', ~goods.1>
+                     ) ▶₀ #vr.18 )
+                case UOpenAndOrderMA
+                solve( SIn( 'U-APA', ~session, $apa_id, $u_id,
+                            <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                       ) ▶₁ #i )
+                  case SecureChannelSendRecv
+                  solve( SOut( 'U-APA', ~session, $apa_id, $u_id,
+                               <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                         ) ▶₀ #vr.21 )
+                    case APAReceiveConfirmationAndNotifyU
+                    solve( SOut( 'APA-APS', ~session.1, $apa_id.1, $aps_id.1,
+                                 <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1, 
+                                  sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1
+                                       >,
+                                       ~m_sk)
+                                 >
+                           ) ▶₀ #vr.28 )
+                      case APASendPaymentAPS_case_1
+                      solve( SOut( 'MA-APA', ~session.1, $ma_id.1, $apa_id.1,
+                                   <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url, 
+                                    sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url>,
+                                         ~m_sk)
+                                   >
+                             ) ▶₀ #vr.33 )
+                        case MACallAPA
+                        solve( SOut( 'MA-MS', ~session.1, $ms_id, $ma_id.1,
+                                     <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url, 
+                                      sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url>,
+                                           ~m_sk)
+                                     >
+                               ) ▶₀ #vr.35 )
+                          case MSProcessOrderMA
+                          solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                                 ) @ #i2 )
+                            case UReceiveNotification
+                            solve( U_State( 'pwdsubmitted', ~session.1,
+                                            <$u_id.1, $ma_id.1, $ms_id.1, $apa_id.1, $aps_id.1, ~password.1, 
+                                             ~goods>
+                                   ) ▶₀ #i2 )
+                              case USubmitPasswordAPA
+                              by contradiction /* from formulas */
+                            qed
+                          qed
+                        qed
+                      next
+                        case breakChannelConfidentiality
+                        solve( SOut( 'MA-APA', ~session.1, $ma_id.1, $apa_id.1,
+                                     <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url, 
+                                      sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url>,
+                                           ~m_sk)
+                                     >
+                               ) ▶₀ #vr.34 )
+                          case MACallAPA
+                          by solve( SOut( 'MA-MS', ~session.1, $ms_id, $ma_id.1,
+                                          <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url, 
+                                           sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                                 $notify_url>,
+                                                ~m_sk)
+                                          >
+                                    ) ▶₀ #vr.35 )
+                        qed
+                      qed
+                    next
+                      case APASendPaymentAPS_case_2
+                      solve( !KU( sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                        $notify_url>,
+                                       ~m_sk)
+                             ) @ #vk.18 )
+                        case breakChannelConfidentiality
+                        solve( SOut( 'MA-APA', ~session, $ma_id, $apa_id,
+                                     <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                                      $notify_url, 
+                                      sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                                            $notify_url>,
+                                           ~m_sk)
+                                     >
+                               ) ▶₀ #vr.34 )
+                          case breakChannelConfidentiality
+                          by contradiction /* cyclic */
+                        qed
+                      next
+                        case c_sign
+                        solve( !KU( ~m_sk ) @ #vk.21 )
+                          case breakChannelConfidentiality_case_1
+                          solve( SOut( 'MA-APA', ~session.2, $src, $dst,
+                                       <~m_sk, <~out_trade_no.1, total_amount, subject.1>, $notify_url.2, 
+                                        m_sig>
+                                 ) ▶₀ #vr.34 )
+                            case MACallAPA
+                            by solve( SOut( 'MA-MS', ~session.2, $ms_id.1, $src,
+                                            <~m_sk, <~out_trade_no.1, total_amount, subject.1>, 
+                                             $notify_url.1, m_sig>
+                                      ) ▶₀ #vr.38 )
+                          next
+                            case breakChannelConfidentiality
+                            by contradiction /* cyclic */
+                          qed
+                        next
+                          case breakChannelConfidentiality_case_2
+                          solve( SOut( 'MA-APA', ~session.2, $src, $dst,
+                                       <~app_id.1, <~m_sk, total_amount, subject.1>, $notify_url.2, m_sig>
+                                 ) ▶₀ #vr.34 )
+                            case MACallAPA
+                            by solve( SOut( 'MA-MS', ~session.2, $ms_id.1, $src,
+                                            <~app_id.1, <~m_sk, total_amount, subject.1>, $notify_url.1, m_sig
+                                            >
+                                      ) ▶₀ #vr.40 )
+                          next
+                            case breakChannelConfidentiality
+                            by contradiction /* cyclic */
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          next
+            case breakChannelConfidentiality
+            solve( SOut( 'MA-APA', ~session, $ma_id, $apa_id,
+                         <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                          $notify_url.1, 
+                          sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                                $notify_url.1>,
+                               ~m_sk)
+                         >
+                   ) ▶₀ #vr.15 )
+              case MACallAPA
+              solve( SOut( 'MA-MS', ~session, $ms_id, $ma_id,
+                           <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                            $notify_url, 
+                            sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                                  $notify_url>,
+                                 ~m_sk)
+                           >
+                     ) ▶₀ #vr.16 )
+                case MSProcessOrderMA
+                solve( SOut( 'U-MA', ~session, $u_id, $ma_id,
+                             <'OpenAppAndOrder', ~goods.1>
+                       ) ▶₀ #vr.18 )
+                  case UOpenAndOrderMA
+                  solve( SIn( 'U-APA', ~session, $apa_id, $u_id,
+                              <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                         ) ▶₁ #i )
+                    case SecureChannelSendRecv
+                    solve( SOut( 'U-APA', ~session, $apa_id, $u_id,
+                                 <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                           ) ▶₀ #vr.21 )
+                      case APAReceiveConfirmationAndNotifyU
+                      solve( SOut( 'APA-APS', ~session.1, $apa_id.1, $aps_id.1,
+                                   <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1, 
+                                    sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1
+                                         >,
+                                         ~m_sk)
+                                   >
+                             ) ▶₀ #vr.28 )
+                        case APASendPaymentAPS_case_1
+                        solve( SOut( 'MA-APA', ~session.1, $ma_id.1, $apa_id.1,
+                                     <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1, 
+                                      sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1
+                                           >,
+                                           ~m_sk)
+                                     >
+                               ) ▶₀ #vr.33 )
+                          case MACallAPA
+                          by solve( SOut( 'MA-MS', ~session.1, $ms_id, $ma_id.1,
+                                          <~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                           $notify_url.1, 
+                                           sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                                 $notify_url.1>,
+                                                ~m_sk)
+                                          >
+                                    ) ▶₀ #vr.35 )
+                        next
+                          case breakChannelConfidentiality
+                          solve( SOut( 'MA-APA', ~session.1, $ma_id.1, $apa_id.1,
+                                       <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1, 
+                                        sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                              $notify_url.1>,
+                                             ~m_sk)
+                                       >
+                                 ) ▶₀ #vr.34 )
+                            case MACallAPA
+                            solve( SOut( 'MA-MS', ~session.1, $ms_id, $ma_id.1,
+                                         <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1, 
+                                          sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                                $notify_url.1>,
+                                               ~m_sk)
+                                         >
+                                   ) ▶₀ #vr.35 )
+                              case MSProcessOrderMA
+                              solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                                     ) @ #i2 )
+                                case UReceiveNotification
+                                solve( U_State( 'pwdsubmitted', ~session.1,
+                                                <$u_id.1, $ma_id.1, $ms_id.1, $apa_id.1, $aps_id.1, 
+                                                 ~password.1, ~goods>
+                                       ) ▶₀ #i2 )
+                                  case USubmitPasswordAPA
+                                  by contradiction /* from formulas */
+                                qed
+                              qed
+                            qed
+                          qed
+                        qed
+                      next
+                        case APASendPaymentAPS_case_2
+                        solve( !KU( sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                          $notify_url.1>,
+                                         ~m_sk)
+                               ) @ #vk.18 )
+                          case breakChannelConfidentiality
+                          by solve( SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+                                          <<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, 
+                                           sign(<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, ~a_sk)>
+                                    ) ▶₀ #vr.23 )
+                        next
+                          case c_sign
+                          solve( !KU( ~m_sk ) @ #vk.21 )
+                            case breakChannelConfidentiality_case_1
+                            solve( SOut( 'MA-APA', ~session.2, $src, $dst,
+                                         <~m_sk, <~out_trade_no.1, total_amount, subject.1>, $notify_url.2, 
+                                          m_sig>
+                                   ) ▶₀ #vr.34 )
+                              case MACallAPA
+                              by solve( SOut( 'MA-MS', ~session.2, $ms_id.1, $src,
+                                              <~m_sk, <~out_trade_no.1, total_amount, subject.1>, 
+                                               $notify_url.2, m_sig>
+                                        ) ▶₀ #vr.38 )
+                            next
+                              case breakChannelConfidentiality
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case breakChannelConfidentiality_case_2
+                            solve( SOut( 'MA-APA', ~session.2, $src, $dst,
+                                         <~app_id.1, <~m_sk, total_amount, subject.1>, $notify_url.2, m_sig>
+                                   ) ▶₀ #vr.34 )
+                              case MACallAPA
+                              by solve( SOut( 'MA-MS', ~session.2, $ms_id.1, $src,
+                                              <~app_id.1, <~m_sk, total_amount, subject.1>, $notify_url.2, 
+                                               m_sig>
+                                        ) ▶₀ #vr.40 )
+                            next
+                              case breakChannelConfidentiality
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    next
+      case APARequestUserPassword_case_2
+      solve( SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+                   <'SReqPwd', calc_amt(~goods), gen_desc(~goods)>
+             ) ▶₀ #vr.10 )
+        case APSVerifyPaymentAPA
+        solve( SOut( 'APA-APS', ~session, $apa_id, $aps_id,
+                     <~app_id, <~out_trade_no.1, calc_amt(~goods), gen_desc(~goods)>, 
+                      $notify_url.2, 
+                      sign(<~app_id, <~out_trade_no.1, calc_amt(~goods), gen_desc(~goods)>, 
+                            $notify_url.2>,
+                           ~m_sk)
+                     >
+               ) ▶₀ #vr.14 )
+          case APASendPaymentAPS
+          solve( !KU( sign(<~app_id, 
+                            <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, $notify_url.1>,
+                           ~m_sk)
+                 ) @ #vk.18 )
+            case OrderCreateOracle
+            solve( SIn( 'U-APA', ~session, $apa_id, $u_id,
+                        <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                   ) ▶₁ #i )
+              case SecureChannelSendRecv
+              solve( SOut( 'U-APA', ~session, $apa_id, $u_id,
+                           <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                     ) ▶₀ #vr.19 )
+                case APAReceiveConfirmationAndNotifyU
+                solve( SOut( 'APA-APS', ~session.1, $apa_id.1, $aps_id.1,
+                             <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1, 
+                              sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1
+                                   >,
+                                   ~m_sk)
+                             >
+                       ) ▶₀ #vr.26 )
+                  case APASendPaymentAPS_case_1
+                  solve( SOut( 'MA-APA', ~session.1, $ma_id.1, $apa_id.1,
+                               <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url, 
+                                sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url>,
+                                     ~m_sk)
+                               >
+                         ) ▶₀ #vr.31 )
+                    case MACallAPA
+                    by solve( SOut( 'MA-MS', ~session.1, $ms_id, $ma_id.1,
+                                    <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url, 
+                                     sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url>,
+                                          ~m_sk)
+                                    >
+                              ) ▶₀ #vr.33 )
+                  next
+                    case breakChannelConfidentiality
+                    solve( SOut( 'MA-APA', ~session.1, $ma_id.1, $apa_id.1,
+                                 <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url, 
+                                  sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url>,
+                                       ~m_sk)
+                                 >
+                           ) ▶₀ #vr.32 )
+                      case MACallAPA
+                      by solve( SOut( 'MA-MS', ~session.1, $ms_id, $ma_id.1,
+                                      <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url, 
+                                       sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url
+                                            >,
+                                            ~m_sk)
+                                      >
+                                ) ▶₀ #vr.33 )
+                    qed
+                  qed
+                next
+                  case APASendPaymentAPS_case_2
+                  solve( !KU( sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                    $notify_url>,
+                                   ~m_sk)
+                         ) @ #vk.33 )
+                    case OrderCreateOracle
+                    solve( SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+                                 <<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, 
+                                  sign(<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, ~a_sk)>
+                           ) ▶₀ #vr.21 )
+                      case APSVerifyPasswordAndConfirmAPA
+                      solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                             ) @ #i2 )
+                        case UReceiveNotification
+                        solve( U_State( 'pwdsubmitted', ~session.1,
+                                        <$u_id.1, $ma_id.1, $ms_id.1, $apa_id.1, $aps_id.1, ~password.1, 
+                                         ~goods>
+                               ) ▶₀ #i2 )
+                          case USubmitPasswordAPA
+                          by contradiction /* from formulas */
+                        qed
+                      qed
+                    qed
+                  next
+                    case c_sign
+                    solve( !KU( ~m_sk ) @ #vk.36 )
+                      case breakChannelConfidentiality_case_1
+                      solve( SOut( 'MA-APA', ~session.2, $src, $dst,
+                                   <~m_sk, <~out_trade_no.1, total_amount, subject.1>, $notify_url.2, m_sig>
+                             ) ▶₀ #vr.32 )
+                        case MACallAPA
+                        by solve( SOut( 'MA-MS', ~session.2, $ms_id.1, $src,
+                                        <~m_sk, <~out_trade_no.1, total_amount, subject.1>, $notify_url.2, 
+                                         m_sig>
+                                  ) ▶₀ #vr.36 )
+                      next
+                        case breakChannelConfidentiality
+                        by contradiction /* cyclic */
+                      qed
+                    next
+                      case breakChannelConfidentiality_case_2
+                      solve( SOut( 'MA-APA', ~session.2, $src, $dst,
+                                   <~app_id.1, <~m_sk, total_amount, subject.1>, $notify_url.2, m_sig>
+                             ) ▶₀ #vr.32 )
+                        case MACallAPA
+                        by solve( SOut( 'MA-MS', ~session.2, $ms_id.1, $src,
+                                        <~app_id.1, <~m_sk, total_amount, subject.1>, $notify_url.2, m_sig>
+                                  ) ▶₀ #vr.38 )
+                      next
+                        case breakChannelConfidentiality
+                        by contradiction /* cyclic */
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          next
+            case breakChannelConfidentiality
+            solve( SOut( 'MA-APA', ~session.1, $src, $dst,
+                         <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                          $notify_url, 
+                          sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                                $notify_url>,
+                               ~m_sk)
+                         >
+                   ) ▶₀ #vr.15 )
+              case MACallAPA
+              solve( SOut( 'MA-MS', ~session.1, $ms_id, $src,
+                           <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                            $notify_url, 
+                            sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                                  $notify_url>,
+                                 ~m_sk)
+                           >
+                     ) ▶₀ #vr.21 )
+                case MSProcessOrderMA
+                solve( SOut( 'U-MA', ~session.1, $u_id, $src,
+                             <'OpenAppAndOrder', ~goods.1>
+                       ) ▶₀ #vr.23 )
+                  case UOpenAndOrderMA
+                  solve( SIn( 'U-APA', ~session, $apa_id, $u_id,
+                              <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                         ) ▶₁ #i )
+                    case SecureChannelSendRecv
+                    solve( SOut( 'U-APA', ~session, $apa_id, $u_id,
+                                 <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                           ) ▶₀ #vr.29 )
+                      case APAReceiveConfirmationAndNotifyU
+                      solve( SOut( 'APA-APS', ~session.2, $apa_id.1, $aps_id.2,
+                                   <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1, 
+                                    sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1
+                                         >,
+                                         ~m_sk)
+                                   >
+                             ) ▶₀ #vr.36 )
+                        case APASendPaymentAPS_case_1
+                        solve( SOut( 'MA-APA', ~session.2, $ma_id.1, $apa_id.1,
+                                     <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1, 
+                                      sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1
+                                           >,
+                                           ~m_sk)
+                                     >
+                               ) ▶₀ #vr.41 )
+                          case MACallAPA
+                          by solve( SOut( 'MA-MS', ~session.2, $ms_id, $ma_id.1,
+                                          <~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                           $notify_url.1, 
+                                           sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                                 $notify_url.1>,
+                                                ~m_sk)
+                                          >
+                                    ) ▶₀ #vr.43 )
+                        next
+                          case breakChannelConfidentiality
+                          solve( SOut( 'MA-APA', ~session.2, $ma_id.1, $apa_id.1,
+                                       <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1, 
+                                        sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                              $notify_url.1>,
+                                             ~m_sk)
+                                       >
+                                 ) ▶₀ #vr.42 )
+                            case MACallAPA
+                            solve( SOut( 'MA-MS', ~session.2, $ms_id, $ma_id.1,
+                                         <~app_id, <~out_trade_no, calc_amt(~goods), subject>, $notify_url.1, 
+                                          sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                                $notify_url.1>,
+                                               ~m_sk)
+                                         >
+                                   ) ▶₀ #vr.43 )
+                              case MSProcessOrderMA
+                              by solve( SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+                                              <<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, 
+                                               sign(<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>,
+                                                    ~a_sk)
+                                              >
+                                        ) ▶₀ #vr.31 )
+                            qed
+                          qed
+                        qed
+                      next
+                        case APASendPaymentAPS_case_2
+                        solve( !KU( sign(<~app_id, <~out_trade_no, calc_amt(~goods), subject>, 
+                                          $notify_url.1>,
+                                         ~m_sk)
+                               ) @ #vk.33 )
+                          case breakChannelConfidentiality
+                          solve( SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+                                       <<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, 
+                                        sign(<~app_id, ~out_trade_no, ~trade_no, calc_amt(~goods)>, ~a_sk)>
+                                 ) ▶₀ #vr.31 )
+                            case APSVerifyPasswordAndConfirmAPA
+                            solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                                   ) @ #i2 )
+                              case UReceiveNotification
+                              solve( U_State( 'pwdsubmitted', ~session.1,
+                                              <$u_id.1, $ma_id.1, $ms_id.1, $apa_id.1, $aps_id.1, 
+                                               ~password.1, ~goods>
+                                     ) ▶₀ #i2 )
+                                case USubmitPasswordAPA
+                                by contradiction /* from formulas */
+                              qed
+                            qed
+                          qed
+                        next
+                          case c_sign
+                          solve( !KU( ~m_sk ) @ #vk.36 )
+                            case breakChannelConfidentiality_case_1
+                            solve( SOut( 'MA-APA', ~session.3, $src.1, $dst.1,
+                                         <~m_sk, <~out_trade_no.1, total_amount, subject.1>, $notify_url.2, 
+                                          m_sig>
+                                   ) ▶₀ #vr.42 )
+                              case MACallAPA
+                              by solve( SOut( 'MA-MS', ~session.3, $ms_id.1, $src.1,
+                                              <~m_sk, <~out_trade_no.1, total_amount, subject.1>, 
+                                               $notify_url.2, m_sig>
+                                        ) ▶₀ #vr.46 )
+                            next
+                              case breakChannelConfidentiality
+                              by contradiction /* cyclic */
+                            qed
+                          next
+                            case breakChannelConfidentiality_case_2
+                            solve( SOut( 'MA-APA', ~session.3, $src.1, $dst.1,
+                                         <~app_id.1, <~m_sk, total_amount, subject.1>, $notify_url.2, m_sig>
+                                   ) ▶₀ #vr.42 )
+                              case MACallAPA
+                              by solve( SOut( 'MA-MS', ~session.3, $ms_id.1, $src.1,
+                                              <~app_id.1, <~m_sk, total_amount, subject.1>, $notify_url.2, 
+                                               m_sig>
+                                        ) ▶₀ #vr.48 )
+                            next
+                              case breakChannelConfidentiality
+                              by contradiction /* cyclic */
+                            qed
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            next
+              case breakChannelConfidentiality
+              by contradiction /* cyclic */
+            qed
+          next
+            case c_sign
+            solve( !KU( ~m_sk ) @ #vk.21 )
+              case breakChannelConfidentiality_case_1
+              solve( SOut( 'MA-APA', ~session.1, $src, $dst,
+                           <~m_sk, <~out_trade_no.1, total_amount, subject>, $notify_url.2, m_sig>
+                     ) ▶₀ #vr.15 )
+                case MACallAPA
+                by solve( SOut( 'MA-MS', ~session.1, $ms_id.1, $src,
+                                <~m_sk, <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+                          ) ▶₀ #vr.19 )
+              next
+                case breakChannelConfidentiality
+                by contradiction /* cyclic */
+              qed
+            next
+              case breakChannelConfidentiality_case_2
+              solve( SOut( 'MA-APA', ~session.1, $src, $dst,
+                           <~app_id.1, <~m_sk, total_amount, subject>, $notify_url.2, m_sig>
+                     ) ▶₀ #vr.15 )
+                case MACallAPA
+                by solve( SOut( 'MA-MS', ~session.1, $ms_id.1, $src,
+                                <~app_id, <~m_sk, total_amount, subject>, $notify_url, m_sig>
+                          ) ▶₀ #vr.21 )
+              next
+                case breakChannelConfidentiality
+                by contradiction /* cyclic */
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma No_Payment_Without_Password_Input [heuristic={default}]:
+  all-traces
+  "∀ u p s #i.
+    (PaymentComplete( u, h(p), s ) @ #i) ⇒
+    (∃ #j.
+      ((UserInputPwd( u, p, s ) @ #j) ∧ (#j < #i)) ∧
+      (¬(∃ u2 p2 #i2.
+          (PaymentComplete( u2, h(p2), s ) @ #i2) ∧ (¬(#i2 = #i)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ u p s #i.
+  (PaymentComplete( u, h(p), s ) @ #i)
+ ∧
+  ∀ #j.
+   (UserInputPwd( u, p, s ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨
+    (∃ u2 p2 #i2. (PaymentComplete( u2, h(p2), s ) @ #i2) ∧ ¬(#i2 = #i)))"
+*/
+simplify
+solve( APS_State( 'waitpwd', ~session,
+                  <$aps_id, $apa_id, $ms_id, ~a_sk, ~app_id, 
+                   <~out_trade_no, total_amount, subject>, $notify_url, m_sig>
+       ) ▶₂ #i )
+  case APSVerifyPaymentAPA
+  solve( SOut( 'APA-APS', ~session, $apa_id, $aps_id,
+               <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, 
+                sign(<~app_id, <~out_trade_no, total_amount, subject>, $notify_url>,
+                     ~m_sk)
+               >
+         ) ▶₀ #vr.1 )
+    case APASendPaymentAPS_case_1
+    solve( SOut( 'MA-APA', ~session, $ma_id, $apa_id,
+                 <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, 
+                  sign(<~app_id, <~out_trade_no, total_amount, subject>, $notify_url>,
+                       ~m_sk)
+                 >
+           ) ▶₀ #vr.9 )
+      case MACallAPA
+      solve( SOut( 'MA-MS', ~session, $ms_id, $ma_id,
+                   <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, 
+                    sign(<~app_id, <~out_trade_no, total_amount, subject>, $notify_url>,
+                         ~m_sk)
+                   >
+             ) ▶₀ #vr.11 )
+        case MSProcessOrderMA
+        solve( SOut( 'U-MA', ~session, $u_id.1, $ma_id,
+                     <'OpenAppAndOrder', ~goods.1>
+               ) ▶₀ #vr.13 )
+          case UOpenAndOrderMA
+          solve( SIn( 'APA-APS', ~session, $apa_id, $aps_id, h(p) ) ▶₁ #i )
+            case SecureChannelSendRecv
+            solve( SOut( 'APA-APS', ~session, $apa_id, $aps_id, h(p) ) ▶₀ #vr.17 )
+              case APASubmitPasswordAPS
+              solve( SOut( 'U-APA', ~session, $u_id.1, $apa_id, ~password ) ▶₀ #vr.19 )
+                case USubmitPasswordAPA
+                solve( SOut( 'U-APA', ~session, $apa_id, $u_id.1,
+                             <'AReqPwd', calc_amt(~goods.1), gen_desc(~goods.1), ~out_trade_no.1>
+                       ) ▶₀ #vr.23 )
+                  case APARequestUserPassword
+                  solve( SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+                               <'SReqPwd', calc_amt(~goods), gen_desc(~goods)>
+                         ) ▶₀ #vr.21 )
+                    case APSVerifyPaymentAPA
+                    solve( !UserRegistered( <$u_id, h(~password)> ) ▶₃ #i )
+                      case CreateU
+                      solve( APS_State( 'waitpwd', ~session,
+                                        <$aps_id.1, $apa_id.1, $ms_id.1, ~a_sk.1, ~app_id.1, 
+                                         <~out_trade_no.1, total_amount, subject>, $notify_url.1, m_sig>
+                             ) ▶₂ #i2 )
+                        case APSVerifyPaymentAPA
+                        by contradiction /* from formulas */
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    next
+      case breakChannelConfidentiality
+      solve( SOut( 'MA-APA', ~session, $ma_id, $apa_id,
+                   <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, 
+                    sign(<~app_id, <~out_trade_no, total_amount, subject>, $notify_url>,
+                         ~m_sk)
+                   >
+             ) ▶₀ #vr.10 )
+        case MACallAPA
+        solve( SOut( 'MA-MS', ~session, $ms_id, $ma_id,
+                     <~app_id, <~out_trade_no, total_amount, subject>, $notify_url, 
+                      sign(<~app_id, <~out_trade_no, total_amount, subject>, $notify_url>,
+                           ~m_sk)
+                     >
+               ) ▶₀ #vr.11 )
+          case MSProcessOrderMA
+          solve( SOut( 'U-MA', ~session, $u_id.1, $ma_id,
+                       <'OpenAppAndOrder', ~goods.1>
+                 ) ▶₀ #vr.13 )
+            case UOpenAndOrderMA
+            solve( SIn( 'APA-APS', ~session, $apa_id, $aps_id, h(p) ) ▶₁ #i )
+              case SecureChannelSendRecv
+              solve( SOut( 'APA-APS', ~session, $apa_id, $aps_id, h(p) ) ▶₀ #vr.17 )
+                case APASubmitPasswordAPS
+                solve( SOut( 'U-APA', ~session, $u_id.1, $apa_id, ~password ) ▶₀ #vr.19 )
+                  case USubmitPasswordAPA
+                  solve( SOut( 'U-APA', ~session, $apa_id, $u_id.1,
+                               <'AReqPwd', calc_amt(~goods.1), gen_desc(~goods.1), ~out_trade_no.1>
+                         ) ▶₀ #vr.23 )
+                    case APARequestUserPassword
+                    solve( SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+                                 <'SReqPwd', calc_amt(~goods), gen_desc(~goods)>
+                           ) ▶₀ #vr.21 )
+                      case APSVerifyPaymentAPA
+                      solve( !UserRegistered( <$u_id, h(~password)> ) ▶₃ #i )
+                        case CreateU
+                        solve( APS_State( 'waitpwd', ~session,
+                                          <$aps_id.1, $apa_id.1, $ms_id.1, ~a_sk.1, ~app_id.1, 
+                                           <~out_trade_no.1, total_amount, subject>, $notify_url.1, m_sig>
+                               ) ▶₂ #i2 )
+                          case APSVerifyPaymentAPA
+                          by contradiction /* from formulas */
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  next
+    case APASendPaymentAPS_case_2
+    solve( !KU( sign(<~app_id, <~out_trade_no, total_amount, subject>, 
+                      $notify_url>,
+                     ~m_sk)
+           ) @ #vk.18 )
+      case OrderCreateOracle
+      solve( SIn( 'APA-APS', ~session, $apa_id, $aps_id, h(p) ) ▶₁ #i )
+        case SecureChannelSendRecv
+        solve( SOut( 'APA-APS', ~session, $apa_id, $aps_id, h(p) ) ▶₀ #vr.14 )
+          case APASubmitPasswordAPS
+          solve( SOut( 'U-APA', ~session, $u_id.1, $apa_id, ~password ) ▶₀ #vr.16 )
+            case USubmitPasswordAPA
+            solve( SOut( 'U-APA', ~session, $apa_id, $u_id.1,
+                         <'AReqPwd', calc_amt(~goods), gen_desc(~goods), ~out_trade_no.1>
+                   ) ▶₀ #vr.21 )
+              case APARequestUserPassword
+              solve( SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+                           <'SReqPwd', calc_amt(~goods), gen_desc(~goods)>
+                     ) ▶₀ #vr.18 )
+                case APSVerifyPaymentAPA
+                solve( !UserRegistered( <$u_id, h(~password)> ) ▶₃ #i )
+                  case CreateU
+                  solve( APS_State( 'waitpwd', ~session,
+                                    <$aps_id.1, $apa_id.1, $ms_id.1, ~a_sk.1, ~app_id.1, 
+                                     <~out_trade_no.1, total_amount, subject>, $notify_url.1, m_sig>
+                         ) ▶₂ #i2 )
+                    case APSVerifyPaymentAPA
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    next
+      case breakChannelConfidentiality
+      solve( SOut( 'MA-APA', ~session.1, $src, $dst,
+                   <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                    $notify_url, 
+                    sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                          $notify_url>,
+                         ~m_sk)
+                   >
+             ) ▶₀ #vr.10 )
+        case MACallAPA
+        solve( SOut( 'MA-MS', ~session.1, $ms_id, $src,
+                     <~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                      $notify_url, 
+                      sign(<~app_id, <~out_trade_no, calc_amt(~goods), gen_desc(~goods)>, 
+                            $notify_url>,
+                           ~m_sk)
+                     >
+               ) ▶₀ #vr.16 )
+          case MSProcessOrderMA
+          solve( SOut( 'U-MA', ~session.1, $u_id.1, $src,
+                       <'OpenAppAndOrder', ~goods.1>
+                 ) ▶₀ #vr.18 )
+            case UOpenAndOrderMA
+            solve( SIn( 'APA-APS', ~session, $apa_id, $aps_id, h(p) ) ▶₁ #i )
+              case SecureChannelSendRecv
+              solve( SOut( 'APA-APS', ~session, $apa_id, $aps_id, h(p) ) ▶₀ #vr.24 )
+                case APASubmitPasswordAPS
+                solve( SOut( 'U-APA', ~session, $u_id.1, $apa_id, ~password ) ▶₀ #vr.26 )
+                  case USubmitPasswordAPA
+                  solve( SOut( 'U-APA', ~session, $apa_id, $u_id.1,
+                               <'AReqPwd', calc_amt(~goods.2), gen_desc(~goods.2), ~out_trade_no.1>
+                         ) ▶₀ #vr.31 )
+                    case APARequestUserPassword
+                    solve( SOut( 'APA-APS', ~session, $aps_id, $apa_id,
+                                 <'SReqPwd', calc_amt(~goods), gen_desc(~goods)>
+                           ) ▶₀ #vr.28 )
+                      case APSVerifyPaymentAPA
+                      solve( !UserRegistered( <$u_id, h(~password)> ) ▶₃ #i )
+                        case CreateU
+                        solve( APS_State( 'waitpwd', ~session,
+                                          <$aps_id.2, $apa_id.1, $ms_id.1, ~a_sk.1, ~app_id.1, 
+                                           <~out_trade_no.1, total_amount, subject>, $notify_url.1, m_sig>
+                               ) ▶₂ #i2 )
+                          case APSVerifyPaymentAPA
+                          by contradiction /* from formulas */
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      next
+        case breakChannelConfidentiality
+        by contradiction /* cyclic */
+      qed
+    next
+      case c_sign
+      solve( !KU( ~m_sk ) @ #vk.21 )
+        case breakChannelConfidentiality_case_1
+        solve( SOut( 'MA-APA', ~session.1, $src, $dst,
+                     <~m_sk, <~out_trade_no.1, total_amount.1, subject.1>, $notify_url.2, 
+                      m_sig>
+               ) ▶₀ #vr.10 )
+          case MACallAPA
+          by solve( SOut( 'MA-MS', ~session.1, $ms_id.1, $src,
+                          <~m_sk, <~out_trade_no.1, total_amount.1, subject.1>, $notify_url.1, 
+                           m_sig>
+                    ) ▶₀ #vr.14 )
+        next
+          case breakChannelConfidentiality
+          by contradiction /* cyclic */
+        qed
+      next
+        case breakChannelConfidentiality_case_2
+        solve( SOut( 'MA-APA', ~session.1, $src, $dst,
+                     <~app_id.1, <~m_sk, total_amount.1, subject.1>, $notify_url.2, m_sig>
+               ) ▶₀ #vr.10 )
+          case MACallAPA
+          by solve( SOut( 'MA-MS', ~session.1, $ms_id.1, $src,
+                          <~app_id.1, <~m_sk, total_amount.1, subject.1>, $notify_url.1, m_sig>
+                    ) ▶₀ #vr.16 )
+        next
+          case breakChannelConfidentiality
+          by contradiction /* cyclic */
+        qed
+      qed
+    qed
+  qed
+qed
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* All wellformedness checks were successful. */
+
+/*
+Generated from:
+Tamarin version 1.10.0
+Maude version 3.1
+Git revision: cb62c305f8c8b8c1e664152aa33c95b7b8d5ef32, branch: master
+Compiled at: 2024-10-30 11:11:02.432289291 UTC
+*/
+
+end
+==============================================================================
+summary of summaries:
+
+analyzed: /root/models/secure_ms_channel/alipay_app.spthy
+
+  output:          /root/results/secure_ms_channel/alipay_app.spthy
+  processing time: 6.09s
+  
+  typing (all-traces): verified (27 steps)
+  executable (exists-trace): verified (36 steps)
+  PS_MS_Order_Injective_Agreement (all-traces): falsified - found trace (10 steps)
+  U_MS_Order_Injective_Agreement (all-traces): falsified - found trace (18 steps)
+  MS_PS_Response_Injective_Agreement (all-traces): verified (33 steps)
+  U_PS_Response_Injective_Agreement (all-traces): verified (104 steps)
+  No_Payment_Without_Password_Input (all-traces): verified (53 steps)
+
+==============================================================================

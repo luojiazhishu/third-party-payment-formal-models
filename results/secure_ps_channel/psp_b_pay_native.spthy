@@ -1,0 +1,2168 @@
+theory PSP_B_Pay_Native_Model begin
+
+// Function signature and definition of the equational theory E
+
+functions: calc_amt/1, fst/1, gen_desc/1, h/1, pair/2, pk/1, sdec/2,
+           senc/2, sign/2, snd/1, true/0, verify/3
+equations:
+    fst(<x.1, x.2>) = x.1,
+    sdec(senc(x.1, x.2), x.2) = x.1,
+    snd(<x.1, x.2>) = x.2,
+    verify(sign(x.1, x.2), x.1, pk(x.2)) = true
+
+tactic: default
+presort: S
+prio: {id}
+  regex".*Commit.*"
+prio: {id}
+  regex".*!KU\(.*m_sk.*"
+prio: {id}
+  regex".*m_sk.*"
+prio: {id}
+  regex".*_State.*"
+prio: {id}
+  regex".*sign.*"
+prio: {id}
+  regex".*BPS_PubKey.*"
+prio: {id}
+  regex".*SOut\(.*U-.*"
+prio: {id}
+  regex".*SOut\(.*-BPS.*"
+prio: {id}
+  regex".*SIn\(.*U-.*"
+prio: {id}
+  regex".*SIn\(.*-BPS.*"
+
+
+tactic: typing
+presort: S
+prio: {id}
+  regex".*~~>.*"
+prio: {id}
+  regex".*!KU\(\s*sign.*"
+prio: {id}
+  regex".*SOURCE_.*"
+prio: {id}
+  regex".*BPS_PublicKey.*"
+prio: {id}
+  regex".*SOut\(.*U-.*"
+prio: {id}
+  regex".*SOut\(.*-BPS.*"
+prio: {id}
+  regex".*SIn\(.*U-.*"
+prio: {id}
+  regex".*SIn\(.*-BPS.*"
+prio: {id}
+  regex".*_State.*"
+deprio: {id}
+  regex".*SOut*"
+deprio: {id}
+  regex".*SIn*"
+
+
+
+heuristic: S
+
+
+
+
+
+
+
+restriction OnlyOnceV:
+  "∀ x #i #j. ((OnlyOnceV( x ) @ #i) ∧ (OnlyOnceV( x ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+restriction Equality:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  // safety formula
+
+restriction Inequality:
+  "∀ x #i. (Neq( x, x ) @ #i) ⇒ (⊥)"
+  // safety formula
+
+restriction InsecureChannel:
+  "∀ ch_id #i. (InsecureChannel( ch_id ) @ #i) ⇒ (ch_id = 'PW-MS')"
+  // safety formula
+
+rule (modulo E) SecureChannelSendRecv[color=#f0f5e5]:
+   [ SOut( ch_id, ~session, $src, $dst, msg ) ]
+  --[ Neq( $src, $dst ) ]->
+   [ SIn( ch_id, ~session, $src, $dst, msg ) ]
+
+  // loop breaker: [0]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) breakChannelConfidentiality[color=#fccb16]:
+   [ SOut( ch_id, ~session, $src, $dst, msg ) ]
+  --[
+  OnlyOnceV( <$src, $dst, msg> ), BreakChannelCon( ch_id ),
+  InsecureChannel( ch_id ),
+  SOURCE_IN_FACT_BkChaCon( ch_id, ~session, $src, $dst, msg )
+  ]->
+   [ SOut( ch_id, ~session, $src, $dst, msg ), Out( <$src, $dst, msg> ) ]
+
+  // loop breaker: [0]
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) breakChannelIntegrity[color=#f25a47]:
+   [ In( <ch_id, ~session, $src, $dst, msg> ) ]
+  --[
+  BreakChannelInt( ch_id ), InsecureChannel( ch_id ),
+  SOURCE_OUT_FACT_BkChaInt( ch_id, ~session, $src, $dst, msg )
+  ]->
+   [ SIn( ch_id, ~session, $src, $dst, msg ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) OrderCreateOracle[color=#f9d27d]:
+   [
+   Fr( ~code_url ), Fr( ~out_trade_no ), In( <amount, description> ),
+   !MerchantCreated( <$ms_id, ~app_id, ~mch_id, $notify_url, ~m_sk> )
+   ]
+  --[ Oracle( ) ]->
+   [
+   Out( ~code_url ),
+   !MS_Database( $ms_id, $attacker, ~code_url, amount, description,
+                 ~out_trade_no
+   ),
+   !BPS_Database( $bps_id, ~code_url, amount, description, ~out_trade_no )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) PaymentQueryOracle[color=#f9d27d]:
+   [
+   In( ~code_url_url ),
+   !BPS_Database( $bps_id, ~code_url, amount, description, ~out_trade_no )
+   ]
+  -->
+   [ Out( <amount, description> ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) CreateBPS[color=#c4c3f3]:
+   [ Fr( ~w_sk ), Fr( ~key_APIv3 ) ]
+  --[ OnlyOnceV( 'BPS' ) ]->
+   [
+   !BPS_PriKey( ~w_sk ), !BPS_PubKey( pk(~w_sk) ),
+   !BPS_APIv3Key( ~key_APIv3 )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) CreatePW[color=#f3c3c7]:
+   [ ]
+  --[ OnlyOnceV( <'PW', $pw_id> ) ]->
+   [ PW_State( 'created', 'null', $pw_id ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) CreateU[color=#c5f3c3]:
+   [ Fr( ~password ) ]
+  --[ OnlyOnceV( <'U', $u_id> ) ]->
+   [
+   !UserRegistered( <$u_id, h(~password)> ),
+   !UserPassword( <$u_id, ~password> )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) CreateMS[color=#f3ccc3]:
+   [ Fr( ~app_id ), Fr( ~mch_id ), Fr( ~m_sk ) ]
+  --[ OnlyOnceV( <'MS', $ms_id> ) ]->
+   [
+   !MerchantCreated( <$ms_id, ~app_id, ~mch_id, $notify_url, ~m_sk> ),
+   !MerchantRegistered( <$ms_id, ~app_id, ~mch_id, pk(~m_sk)> )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) NewPaymentSession[color=#d0deaa]:
+   [
+   Fr( ~session ), !BPS_PriKey( ~w_sk ),
+   !UserPassword( <$u_id, ~password> ),
+   !MerchantCreated( <$ms_id, ~app_id, ~mch_id, $notify_url, ~m_sk> ),
+   PW_State( 'created', 'null', $pw_id )
+   ]
+  --[ Start( ~session, $u_id, $pw_id, $ms_id, $bps_id ) ]->
+   [
+   U_State( 'init', ~session, <$u_id, $pw_id, $ms_id, $bps_id, ~password> ),
+   PW_State( 'init', ~session, <$pw_id, $u_id, $ms_id, $bps_id> ),
+   MS_State( 'init', ~session,
+             <$ms_id, $pw_id, $u_id, $bps_id, $notify_url, ~app_id, ~mch_id, ~m_sk>
+   ),
+   BPS_State( 'init', ~session, <$bps_id, $u_id, $pw_id, $ms_id, ~w_sk> ),
+   Out( ~session )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) UOpenAndOrderPW[role="U"]:
+   [
+   Fr( ~goods ),
+   U_State( 'init', ~session, <$u_id, $pw_id, $ms_id, $bps_id, ~password> )
+   ]
+  -->
+   [
+   U_State( 'ordered', ~session,
+            <$u_id, $pw_id, $ms_id, $bps_id, ~password, ~goods>
+   ),
+   SOut( 'U-PW', ~session, $u_id, $pw_id, <'OpenAppAndOrder', ~goods> )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) PWOrderMS[role="PW"]:
+   [
+   SIn( 'U-PW', ~session, $u_id, $pw_id, <'OpenAppAndOrder', ~goods> ),
+   PW_State( 'init', ~session, <$pw_id, $u_id, $ms_id, $bps_id> )
+   ]
+  --[ SOURCE_OUT_FACT_BkChaCon( 'PW-MS', ~session, $pw_id, $ms_id, ~goods )
+  ]->
+   [
+   SOut( 'PW-MS', ~session, $pw_id, $ms_id, ~goods ),
+   PW_State( 'ordered', ~session, <$pw_id, $u_id, $ms_id, $bps_id> )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) MSProcessOrderBPS[role="MS"]:
+   [
+   SIn( 'PW-MS', ~session, $pw_id, $ms_id, ~goods ),
+   MS_State( 'init', ~session,
+             <$ms_id, $pw_id, $u_id, $bps_id, $notify_url, ~app_id, ~mch_id, ~m_sk>
+   ),
+   Fr( ~out_trade_no ), Fr( ~nonce )
+   ]
+  --[
+  SOURCE_OUT_FACT_BkChaCon( 'MS-BPS', ~session, $ms_id, $bps_id,
+                            <
+                             <~mch_id, ~nonce, 
+                              sign(<~nonce, ~app_id, ~mch_id, gen_desc(~goods), ~out_trade_no, 
+                                    $notify_url, calc_amt(~goods)>,
+                                   ~m_sk)
+                             >, 
+                             ~app_id, ~mch_id, gen_desc(~goods), ~out_trade_no, $notify_url, 
+                             calc_amt(~goods)>
+  ),
+  SOURCE_OUT_FACT_M_SIGN( 'MS-BPS', ~session, $ms_id, $bps_id,
+                          <
+                           <~mch_id, ~nonce, 
+                            sign(<~nonce, ~app_id, ~mch_id, gen_desc(~goods), ~out_trade_no, 
+                                  $notify_url, calc_amt(~goods)>,
+                                 ~m_sk)
+                           >, 
+                           ~app_id, ~mch_id, gen_desc(~goods), ~out_trade_no, $notify_url, 
+                           calc_amt(~goods)>
+  ),
+  MS_Running( 'PSAuthMS', $ms_id, $bps_id,
+              <~app_id, ~mch_id, gen_desc(~goods), ~out_trade_no, $notify_url, 
+               calc_amt(~goods)>
+  )
+  ]->
+   [
+   SOut( 'MS-BPS', ~session, $ms_id, $bps_id,
+         <
+          <~mch_id, ~nonce, 
+           sign(<~nonce, ~app_id, ~mch_id, gen_desc(~goods), ~out_trade_no, 
+                 $notify_url, calc_amt(~goods)>,
+                ~m_sk)
+          >, 
+          ~app_id, ~mch_id, gen_desc(~goods), ~out_trade_no, $notify_url, 
+          calc_amt(~goods)>
+   ),
+   MS_State( 'OrderProcessed', ~session,
+             <$ms_id, $pw_id, $u_id, $bps_id, $notify_url, ~app_id, ~mch_id, ~m_sk, 
+              ~out_trade_no, ~goods>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) BPSSendH5urlMS[role="BPS"]:
+   [
+   SIn( 'MS-BPS', ~session, $ms_id, $bps_id,
+        <<~mch_id, ~nonce, m_sig>, ~app_id, ~mch_id, description, ~out_trade_no, 
+         $notify_url, amount>
+   ),
+   BPS_State( 'init', ~session, <$bps_id, $u_id, $pw_id, $ms_id, ~w_sk> ),
+   !MerchantRegistered( <$ms_id, ~app_id, ~mch_id, m_pk> ), Fr( ~code_url )
+   ]
+  --[
+  Eq( verify(m_sig,
+             <~nonce, ~app_id, ~mch_id, description, ~out_trade_no, $notify_url, 
+              amount>,
+             m_pk),
+      true
+  ),
+  PS_Commit( 'PSAuthMS', $bps_id, $ms_id,
+             <~app_id, ~mch_id, description, ~out_trade_no, $notify_url, amount>
+  ),
+  SOURCE_IN_FACT_M_SIGN( 'MS-BPS', ~session, $ms_id, $bps_id,
+                         <<~mch_id, ~nonce, m_sig>, ~app_id, ~mch_id, description, ~out_trade_no, 
+                          $notify_url, amount>
+  )
+  ]->
+   [
+   SOut( 'MS-BPS', ~session, $bps_id, $ms_id, ~code_url ),
+   !BPS_Database( $bps_id, ~code_url, amount, description, ~out_trade_no ),
+   BPS_State( 'sendcodeurl', ~session,
+              <$bps_id, $u_id, $pw_id, $ms_id, ~w_sk>
+   )
+   ]
+
+  /*
+  rule (modulo AC) BPSSendH5urlMS[role="BPS"]:
+     [
+     SIn( 'MS-BPS', ~session, $ms_id, $bps_id,
+          <<~mch_id, ~nonce, m_sig>, ~app_id, ~mch_id, description, ~out_trade_no, 
+           $notify_url, amount>
+     ),
+     BPS_State( 'init', ~session, <$bps_id, $u_id, $pw_id, $ms_id, ~w_sk> ),
+     !MerchantRegistered( <$ms_id, ~app_id, ~mch_id, m_pk> ), Fr( ~code_url )
+     ]
+    --[
+    Eq( z, true ),
+    PS_Commit( 'PSAuthMS', $bps_id, $ms_id,
+               <~app_id, ~mch_id, description, ~out_trade_no, $notify_url, amount>
+    ),
+    SOURCE_IN_FACT_M_SIGN( 'MS-BPS', ~session, $ms_id, $bps_id,
+                           <<~mch_id, ~nonce, m_sig>, ~app_id, ~mch_id, description, ~out_trade_no, 
+                            $notify_url, amount>
+    )
+    ]->
+     [
+     SOut( 'MS-BPS', ~session, $bps_id, $ms_id, ~code_url ),
+     !BPS_Database( $bps_id, ~code_url, amount, description, ~out_trade_no ),
+     BPS_State( 'sendcodeurl', ~session,
+                <$bps_id, $u_id, $pw_id, $ms_id, ~w_sk>
+     )
+     ]
+    variants (modulo AC)
+    1. $notify_url
+             = $notify_url.35
+       ~app_id
+             = ~app_id.38
+       ~mch_id
+             = ~mch_id.40
+       ~nonce
+             = ~nonce.41
+       ~out_trade_no
+             = ~out_trade_no.42
+       amount
+             = amount.45
+       description
+             = description.46
+       m_pk  = m_pk.47
+       m_sig = m_sig.48
+       z     = verify(m_sig.48,
+                      <~nonce.41, ~app_id.38, ~mch_id.40, description.46, ~out_trade_no.42, 
+                       $notify_url.35, amount.45>,
+                      m_pk.47)
+    
+    2. $notify_url
+             = $notify_url.91
+       ~app_id
+             = ~app_id.94
+       ~mch_id
+             = ~mch_id.96
+       ~nonce
+             = ~nonce.97
+       ~out_trade_no
+             = ~out_trade_no.98
+       amount
+             = amount.101
+       description
+             = description.102
+       m_pk  = pk(x.178)
+       m_sig = sign(<~nonce.97, ~app_id.94, ~mch_id.96, description.102, 
+                     ~out_trade_no.98, $notify_url.91, amount.101>,
+                    x.178)
+       z     = true
+  */
+
+rule (modulo E) MSSendCodeurlPW[role="MS"]:
+   [
+   SIn( 'MS-BPS', ~session, $bps_id, $ms_id, ~code_url ),
+   MS_State( 'OrderProcessed', ~session,
+             <$ms_id, $pw_id, $u_id, $bps_id, $notify_url, ~app_id, ~mch_id, ~m_sk, 
+              ~out_trade_no, ~goods>
+   ),
+   Fr( ~nonce )
+   ]
+  --[
+  SOURCE_OUT_FACT_BkChaCon( 'PW-MS', ~session, $ms_id, $pw_id, ~code_url ),
+  MS_Running( 'UAuthMS', $ms_id, $u_id, ~code_url )
+  ]->
+   [
+   SOut( 'PW-MS', ~session, $ms_id, $pw_id, ~code_url ),
+   !MS_Database( $ms_id, $u_id, ~code_url, calc_amt(~goods),
+                 gen_desc(~goods), ~out_trade_no
+   ),
+   MS_State( 'sendcodeurl', ~session,
+             <$ms_id, $pw_id, $u_id, $bps_id, $notify_url, ~app_id, ~mch_id, ~m_sk, 
+              ~out_trade_no>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) PWShowBPS[role="PW"]:
+   [
+   SIn( 'PW-MS', ~session, $ms_id, $pw_id, ~code_url ),
+   PW_State( 'ordered', ~session, <$pw_id, $u_id, $ms_id, $bps_id> )
+   ]
+  --[
+  Finish( 'PW', ~session, $pw_id ),
+  SOURCE_OUT_FACT_BkChaCon( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url
+  )
+  ]->
+   [
+   PW_State( 'showcodeurl', ~session, <$pw_id, $u_id, $ms_id, $bps_id> ),
+   SOut( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) BPSVerifyPaymentPW[role="BPS"]:
+   [
+   SIn( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url ),
+   !BPS_Database( $bps_id, ~code_url, amount, description, ~out_trade_no ),
+   BPS_State( 'sendcodeurl', ~session,
+              <$bps_id, $u_id, $pw_id, $ms_id, ~w_sk>
+   )
+   ]
+  -->
+   [
+   SOut( 'U-BPS', ~session, $bps_id, $u_id,
+         <'SReqPwd', amount, description, ~code_url>
+   ),
+   BPS_State( 'waitpwd', ~session,
+              <$bps_id, $u_id, $pw_id, $ms_id, ~w_sk, ~code_url, ~out_trade_no, 
+               amount, description>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) USubmitPasswordAPA[role="U"]:
+   [
+   U_State( 'ordered', ~session,
+            <$u_id, $pw_id, $ms_id, $bps_id, ~password, ~goods>
+   ),
+   SIn( 'U-BPS', ~session, $bps_id, $u_id,
+        <'SReqPwd', calc_amt(~goods), gen_desc(~goods), ~code_url>
+   ),
+   !UserPassword( <$u_id, ~password> )
+   ]
+  --[
+  UserInputPwd( $u_id, ~password, ~session ),
+  U_Commit( 'UAuthMS', $u_id, $ms_id, ~code_url ), Test( )
+  ]->
+   [
+   SOut( 'U-BPS', ~session, $u_id, $bps_id, ~password ),
+   U_State( 'pwdsubmitted', ~session,
+            <$u_id, $pw_id, $ms_id, $bps_id, ~password, ~goods>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) BPSVerifyPasswordAndConfirmUMS[role="BPS"]:
+   [
+   SIn( 'U-BPS', ~session, $u_id, $bps_id, ~password ),
+   BPS_State( 'waitpwd', ~session,
+              <$bps_id, $u_id, $pw_id, $ms_id, ~w_sk, ~code_url, ~out_trade_no, 
+               amount, description>
+   ),
+   !UserRegistered( <$u_id, h(~password)> ),
+   !MerchantRegistered( <$ms_id, ~app_id, ~mch_id, m_pk> ),
+   !BPS_APIv3Key( ~key_APIv3 ), Fr( ~transaction_id ), Fr( ~nonce_enc ),
+   Fr( ~summary ), Fr( ~id ), Fr( ~nonce_sig )
+   ]
+  --[
+  PS_Running( 'MSAuthPS', $bps_id, $ms_id,
+              <~id, 
+               senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                     ~nonce_enc>,
+                    ~key_APIv3), 
+               ~nonce_enc, ~summary>
+  ),
+  PS_Running( 'UAuthPS', $bps_id, $u_id, <amount, description> ),
+  PaymentComplete( $u_id, h(~password), ~session )
+  ]->
+   [
+   SOut( 'U-BPS', ~session, $bps_id, $u_id,
+         <'PaymentSuccessful', amount, description>
+   ),
+   SOut( 'MS-BPS', ~session, $bps_id, $notify_url,
+         <
+          <~id, 
+           senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                 ~nonce_enc>,
+                ~key_APIv3), 
+           ~nonce_enc, ~summary>, 
+          sign(<
+                <~id, 
+                 senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                       ~nonce_enc>,
+                      ~key_APIv3), 
+                 ~nonce_enc, ~summary>, 
+                ~nonce_sig>,
+               ~w_sk), 
+          ~nonce_sig>
+   ),
+   BPS_State( 'paysuccess', ~session,
+              <$bps_id, $u_id, $pw_id, $ms_id, ~w_sk>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) UReceiveNotification[role="U"]:
+   [
+   SIn( 'U-BPS', ~session, $bps_id, $u_id,
+        <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+   ),
+   U_State( 'pwdsubmitted', ~session,
+            <$u_id, $pw_id, $ms_id, $bps_id, ~password, ~goods>
+   )
+   ]
+  --[
+  Finish( 'U', ~session, $u_id ),
+  U_Commit( 'UAuthPS', $u_id, $bps_id, <calc_amt(~goods), gen_desc(~goods)>
+  )
+  ]->
+   [
+   U_State( 'completed', ~session,
+            <$u_id, $pw_id, $ms_id, $bps_id, ~password, ~goods>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) MSReceiveNotification[role="MS"]:
+   [
+   MS_State( 'sendcodeurl', ~session,
+             <$ms_id, $pw_id, $u_id, $bps_id, $notify_url, ~app_id, ~mch_id, ~m_sk, 
+              ~out_trade_no>
+   ),
+   !MS_Database( $ms_id, $user, ~code_url, amount, description,
+                 ~out_trade_no
+   ),
+   SIn( 'MS-BPS', ~session, $bps_id, $notify_url,
+        <
+         <~id, 
+          senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                ~nonce_enc>,
+               ~key_APIv3), 
+          ~nonce_enc, ~summary>, 
+         res_sign, ~nonce_sig>
+   ),
+   !BPS_APIv3Key( ~key_APIv3 ), !BPS_PubKey( w_pk )
+   ]
+  --[
+  Eq( verify(res_sign,
+             <
+              <~id, 
+               senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                     ~nonce_enc>,
+                    ~key_APIv3), 
+               ~nonce_enc, ~summary>, 
+              ~nonce_sig>,
+             w_pk),
+      true
+  ),
+  Finish( 'MS', ~session, $ms_id ),
+  MS_Commit( 'MSAuthPS', $ms_id, $bps_id,
+             <~id, 
+              senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                    ~nonce_enc>,
+                   ~key_APIv3), 
+              ~nonce_enc, ~summary>
+  )
+  ]->
+   [
+   SOut( 'MS-BPS', ~session, $notify_url, $bps_id, 'Successful' ),
+   MS_State( 'completed', ~session,
+             <$ms_id, $pw_id, $u_id, $bps_id, $notify_url, ~app_id, ~mch_id, ~m_sk>
+   )
+   ]
+
+  /*
+  rule (modulo AC) MSReceiveNotification[role="MS"]:
+     [
+     MS_State( 'sendcodeurl', ~session,
+               <$ms_id, $pw_id, $u_id, $bps_id, $notify_url, ~app_id, ~mch_id, ~m_sk, 
+                ~out_trade_no>
+     ),
+     !MS_Database( $ms_id, $user, ~code_url, amount, description,
+                   ~out_trade_no
+     ),
+     SIn( 'MS-BPS', ~session, $bps_id, $notify_url,
+          <
+           <~id, 
+            senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                  ~nonce_enc>,
+                 ~key_APIv3), 
+            ~nonce_enc, ~summary>, 
+           res_sign, ~nonce_sig>
+     ),
+     !BPS_APIv3Key( ~key_APIv3 ), !BPS_PubKey( w_pk )
+     ]
+    --[
+    Eq( z, true ), Finish( 'MS', ~session, $ms_id ),
+    MS_Commit( 'MSAuthPS', $ms_id, $bps_id,
+               <~id, 
+                senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                      ~nonce_enc>,
+                     ~key_APIv3), 
+                ~nonce_enc, ~summary>
+    )
+    ]->
+     [
+     SOut( 'MS-BPS', ~session, $notify_url, $bps_id, 'Successful' ),
+     MS_State( 'completed', ~session,
+               <$ms_id, $pw_id, $u_id, $bps_id, $notify_url, ~app_id, ~mch_id, ~m_sk>
+     )
+     ]
+    variants (modulo AC)
+    1. ~app_id
+             = ~app_id.44
+       ~id   = ~id.46
+       ~key_APIv3
+             = ~key_APIv3.47
+       ~mch_id
+             = ~mch_id.49
+       ~nonce_enc
+             = ~nonce_enc.50
+       ~nonce_sig
+             = ~nonce_sig.51
+       ~out_trade_no
+             = ~out_trade_no.52
+       ~summary
+             = ~summary.54
+       ~transaction_id
+             = ~transaction_id.55
+       amount
+             = amount.56
+       res_sign
+             = res_sign.58
+       w_pk  = w_pk.59
+       z     = verify(res_sign.58,
+                      <
+                       <~id.46, 
+                        senc(<~app_id.44, ~mch_id.49, ~out_trade_no.52, ~transaction_id.55, 
+                              amount.56, ~nonce_enc.50>,
+                             ~key_APIv3.47), 
+                        ~nonce_enc.50, ~summary.54>, 
+                       ~nonce_sig.51>,
+                      w_pk.59)
+    
+    2. ~app_id
+             = ~app_id.158
+       ~id   = ~id.160
+       ~key_APIv3
+             = ~key_APIv3.161
+       ~mch_id
+             = ~mch_id.163
+       ~nonce_enc
+             = ~nonce_enc.164
+       ~nonce_sig
+             = ~nonce_sig.165
+       ~out_trade_no
+             = ~out_trade_no.166
+       ~summary
+             = ~summary.168
+       ~transaction_id
+             = ~transaction_id.169
+       amount
+             = amount.170
+       res_sign
+             = sign(<
+                     <~id.160, 
+                      senc(<~app_id.158, ~mch_id.163, ~out_trade_no.166, ~transaction_id.169, 
+                            amount.170, ~nonce_enc.164>,
+                           ~key_APIv3.161), 
+                      ~nonce_enc.164, ~summary.168>, 
+                     ~nonce_sig.165>,
+                    x.308)
+       w_pk  = pk(x.308)
+       z     = true
+  */
+
+rule (modulo E) BPSReceiveSuccess[role="BPS"]:
+   [
+   BPS_State( 'paysuccess', ~session,
+              <$bps_id, $u_id, $pw_id, $ms_id, ~w_sk>
+   ),
+   SIn( 'MS-BPS', ~session, $notify_url, $bps_id, 'Successful' )
+   ]
+  --[ Finish( 'BPS', ~session, $bps_id ) ]->
+   [
+   BPS_State( 'completed', ~session, <$bps_id, $u_id, $pw_id, $ms_id, ~w_sk>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+lemma typing [sources, heuristic={typing}]:
+  all-traces
+  "(∀ m1 m2 m3 m4 m5 #i.
+     (SOURCE_IN_FACT_BkChaCon( m1, m2, m3, m4, m5 ) @ #i) ⇒
+     (∃ #j.
+       (SOURCE_OUT_FACT_BkChaCon( m1, m2, m3, m4, m5 ) @ #j) ∧ (#j < #i))) ∧
+   (∀ m1 m2 m3 m4 m5 #i.
+     (SOURCE_IN_FACT_M_SIGN( m1, m2, m3, m4, m5 ) @ #i) ⇒
+     ((∃ #j.
+        (SOURCE_OUT_FACT_M_SIGN( m1, m2, m3, m4, m5 ) @ #j) ∧ (#j < #i)) ∨
+      (∃ #j.
+        (SOURCE_OUT_FACT_BkChaInt( m1, m2, m3, m4, m5 ) @ #j) ∧ (#j < #i))))"
+/*
+guarded formula characterizing all counter-examples:
+"((∃ m1 m2 m3 m4 m5 #i.
+    (SOURCE_IN_FACT_BkChaCon( m1, m2, m3, m4, m5 ) @ #i)
+   ∧
+    ∀ #j.
+     (SOURCE_OUT_FACT_BkChaCon( m1, m2, m3, m4, m5 ) @ #j) ⇒ ¬(#j < #i)) ∨
+  (∃ m1 m2 m3 m4 m5 #i.
+    (SOURCE_IN_FACT_M_SIGN( m1, m2, m3, m4, m5 ) @ #i)
+   ∧
+    (∀ #j.
+      (SOURCE_OUT_FACT_M_SIGN( m1, m2, m3, m4, m5 ) @ #j) ⇒ ¬(#j < #i)) ∧
+    (∀ #j.
+      (SOURCE_OUT_FACT_BkChaInt( m1, m2, m3, m4, m5 ) @ #j) ⇒ ¬(#j < #i))))"
+*/
+induction
+  case empty_trace
+  by contradiction /* from formulas */
+next
+  case non_empty_trace
+  simplify
+  solve( (∃ m1 m2 m3 m4 m5 #i.
+           (SOURCE_IN_FACT_BkChaCon( m1, m2, m3, m4, m5 ) @ #i)
+          ∧
+           ∀ #j.
+            (SOURCE_OUT_FACT_BkChaCon( m1, m2, m3, m4, m5 ) @ #j) ⇒ ¬(#j < #i))  ∥
+         (∃ m1 m2 m3 m4 m5 #i.
+           (SOURCE_IN_FACT_M_SIGN( m1, m2, m3, m4, m5 ) @ #i)
+          ∧
+           (∀ #j.
+             (SOURCE_OUT_FACT_M_SIGN( m1, m2, m3, m4, m5 ) @ #j) ⇒ ¬(#j < #i)) ∧
+           (∀ #j.
+             (SOURCE_OUT_FACT_BkChaInt( m1, m2, m3, m4, m5 ) @ #j) ⇒ ¬(#j < #i))) )
+    case case_1
+    solve( (last(#i))  ∥
+           (∃ #j.
+             (SOURCE_OUT_FACT_BkChaCon( 'PW-MS', ~session, $src, $dst, m5 ) @ #j)
+            ∧
+             (¬(last(#j))) ∧ (#j < #i)) )
+      case case_1
+      solve( SOut( 'PW-MS', ~session, $src, $dst, m5 ) ▶₀ #i )
+        case MSSendCodeurlPW_case_1
+        by contradiction /* from formulas */
+      next
+        case MSSendCodeurlPW_case_2
+        by contradiction /* from formulas */
+      next
+        case PWOrderMS
+        by contradiction /* from formulas */
+      next
+        case breakChannelConfidentiality
+        by contradiction /* cyclic */
+      qed
+    next
+      case case_2
+      by contradiction /* from formulas */
+    qed
+  next
+    case case_2
+    solve( (last(#i))  ∥
+           (∃ #j.
+             (SOURCE_OUT_FACT_M_SIGN( 'MS-BPS', ~session, $ms_id, $bps_id,
+                                      <
+                                       <~mch_id, ~nonce, 
+                                        sign(<~nonce, ~app_id, ~mch_id, description, ~out_trade_no, 
+                                              $notify_url, amount>,
+                                             x)
+                                       >, 
+                                       ~app_id, ~mch_id, description, ~out_trade_no, $notify_url, amount>
+              ) @ #j)
+            ∧
+             (¬(last(#j))) ∧ (#j < #i))  ∥
+           (∃ #j.
+             (SOURCE_OUT_FACT_BkChaInt( 'MS-BPS', ~session, $ms_id, $bps_id,
+                                        <
+                                         <~mch_id, ~nonce, 
+                                          sign(<~nonce, ~app_id, ~mch_id, description, ~out_trade_no, 
+                                                $notify_url, amount>,
+                                               x)
+                                         >, 
+                                         ~app_id, ~mch_id, description, ~out_trade_no, $notify_url, amount>
+              ) @ #j)
+            ∧
+             (¬(last(#j))) ∧ (#j < #i)) )
+      case case_1
+      solve( SIn( 'MS-BPS', ~session, $ms_id, $bps_id,
+                  <
+                   <~mch_id, ~nonce, 
+                    sign(<~nonce, ~app_id, ~mch_id, description, ~out_trade_no, $notify_url, 
+                          amount>,
+                         x)
+                   >, 
+                   ~app_id, ~mch_id, description, ~out_trade_no, $notify_url, amount>
+             ) ▶₀ #i )
+        case SecureChannelSendRecv
+        solve( SOut( 'MS-BPS', ~session, $ms_id, $bps_id,
+                     <
+                      <~mch_id, ~nonce, 
+                       sign(<~nonce, ~app_id, ~mch_id, description, ~out_trade_no, $notify_url, 
+                             amount>,
+                            x)
+                      >, 
+                      ~app_id, ~mch_id, description, ~out_trade_no, $notify_url, amount>
+               ) ▶₀ #vr )
+          case MSProcessOrderBPS_case_1
+          by contradiction /* from formulas */
+        next
+          case MSProcessOrderBPS_case_2
+          by contradiction /* from formulas */
+        qed
+      qed
+    next
+      case case_2
+      by contradiction /* from formulas */
+    qed
+  qed
+qed
+
+lemma executable [heuristic={default}]:
+  exists-trace
+  "∃ session u_id pw_id ms_id bps_id #i #j #k #l #m.
+    ((((Start( session, u_id, pw_id, ms_id, bps_id ) @ #m) ∧
+       (Finish( 'U', session, u_id ) @ #i)) ∧
+      (Finish( 'PW', session, pw_id ) @ #j)) ∧
+     (Finish( 'MS', session, ms_id ) @ #k)) ∧
+    (Finish( 'BPS', session, bps_id ) @ #l)"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ session u_id pw_id ms_id bps_id #i #j #k #l #m.
+  (Start( session, u_id, pw_id, ms_id, bps_id ) @ #m) ∧
+  (Finish( 'U', session, u_id ) @ #i) ∧
+  (Finish( 'PW', session, pw_id ) @ #j) ∧
+  (Finish( 'MS', session, ms_id ) @ #k) ∧
+  (Finish( 'BPS', session, bps_id ) @ #l)"
+*/
+simplify
+solve( !MerchantCreated( <$ms_id, ~app_id, ~mch_id, $notify_url, ~m_sk>
+       ) ▶₃ #m )
+  case CreateMS
+  solve( PW_State( 'created', 'null', $pw_id ) ▶₄ #m )
+    case CreatePW
+    solve( !BPS_PriKey( ~w_sk ) ▶₁ #m )
+      case CreateBPS
+      solve( !UserPassword( <$u_id, ~password> ) ▶₂ #m )
+        case CreateU
+        solve( Finish( 'U', ~session, $u_id ) @ #i )
+          case UReceiveNotification
+          solve( U_State( 'pwdsubmitted', ~session,
+                          <$u_id, $pw_id, $ms_id, $bps_id, ~password, ~goods>
+                 ) ▶₁ #i )
+            case USubmitPasswordAPA
+            solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                         <'SReqPwd', calc_amt(~goods), gen_desc(~goods), ~code_url>
+                   ) ▶₀ #vr.6 )
+              case BPSVerifyPaymentPW_case_2
+              solve( SOut( 'MS-BPS', ~session.1, $ms_id.1, $bps_id,
+                           <
+                            <~mch_id.1, ~nonce, 
+                             sign(<~nonce, ~app_id.1, ~mch_id.1, gen_desc(~goods), ~out_trade_no, 
+                                   $notify_url.1, calc_amt(~goods)>,
+                                  ~m_sk.1)
+                            >, 
+                            ~app_id.1, ~mch_id.1, gen_desc(~goods), ~out_trade_no, $notify_url.1, 
+                            calc_amt(~goods)>
+                     ) ▶₀ #vr.11 )
+                case MSProcessOrderBPS_case_1
+                solve( SOut( 'MS-BPS', ~session, $ms_id, $bps_id,
+                             <
+                              <~mch_id, ~nonce.1, 
+                               sign(<~nonce.1, ~app_id, ~mch_id, description, ~out_trade_no.1, 
+                                     $notify_url.2, amount>,
+                                    ~m_sk)
+                              >, 
+                              ~app_id, ~mch_id, description, ~out_trade_no.1, $notify_url.2, amount>
+                       ) ▶₀ #vr.14 )
+                  case MSProcessOrderBPS_case_1
+                  solve( SOut( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url ) ▶₀ #vr.8 )
+                    case PWShowBPS_case_1
+                    solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                                 <'OpenAppAndOrder', ~goods.2>
+                           ) ▶₀ #vr.24 )
+                      case UOpenAndOrderPW
+                      solve( SIn( 'U-BPS', ~session, $bps_id, $u_id,
+                                  <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                             ) ▶₀ #i )
+                        case SecureChannelSendRecv
+                        solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                                     <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                               ) ▶₀ #vr.25 )
+                          case BPSVerifyPasswordAndConfirmUMS
+                          solve( SOut( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #vr.27 )
+                            case USubmitPasswordAPA
+                            solve( Finish( 'PW', ~session, $pw_id ) @ #j )
+                              case PWShowBPS
+                              solve( PW_State( 'ordered', ~session,
+                                               <$pw_id, $u_id.1, $ms_id.1, $bps_id.1>
+                                     ) ▶₁ #j )
+                                case PWOrderMS
+                                solve( Finish( 'MS', ~session, $ms_id ) @ #k )
+                                  case MSReceiveNotification
+                                  solve( MS_State( 'sendcodeurl', ~session,
+                                                   <$ms_id, $pw_id.1, $u_id.1, $bps_id.1, $notify_url, 
+                                                    ~app_id, ~mch_id, ~m_sk, ~out_trade_no>
+                                         ) ▶₀ #k )
+                                    case MSSendCodeurlPW
+                                    solve( SIn( 'MS-BPS', ~session, $bps_id, $notify_url,
+                                                <
+                                                 <~id, 
+                                                  senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, 
+                                                        amount, ~nonce_enc>,
+                                                       ~key_APIv3), 
+                                                  ~nonce_enc, ~summary>, 
+                                                 sign(<
+                                                       <~id, 
+                                                        senc(<~app_id, ~mch_id, ~out_trade_no, 
+                                                              ~transaction_id, amount, ~nonce_enc>,
+                                                             ~key_APIv3), 
+                                                        ~nonce_enc, ~summary>, 
+                                                       ~nonce_sig>,
+                                                      x), 
+                                                 ~nonce_sig>
+                                           ) ▶₂ #k )
+                                      case SecureChannelSendRecv
+                                      solve( SOut( 'MS-BPS', ~session, $bps_id, $notify_url,
+                                                   <
+                                                    <~id, 
+                                                     senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, 
+                                                           amount, ~nonce_enc>,
+                                                          ~key_APIv3), 
+                                                     ~nonce_enc, ~summary>, 
+                                                    sign(<
+                                                          <~id, 
+                                                           senc(<~app_id, ~mch_id, ~out_trade_no, 
+                                                                 ~transaction_id, amount, ~nonce_enc>,
+                                                                ~key_APIv3), 
+                                                           ~nonce_enc, ~summary>, 
+                                                          ~nonce_sig>,
+                                                         x), 
+                                                    ~nonce_sig>
+                                             ) ▶₀ #vr.29 )
+                                        case BPSVerifyPasswordAndConfirmUMS
+                                        solve( !BPS_PubKey( pk(~w_sk) ) ▶₄ #k )
+                                          case CreateBPS
+                                          solve( SOut( 'MS-BPS', ~session, $bps_id, $ms_id, ~code_url.2
+                                                 ) ▶₀ #vr.20 )
+                                            case BPSSendH5urlMS
+                                            solve( !MS_Database( $ms_id, $user, ~code_url.1, calc_amt(~goods),
+                                                                 description, ~out_trade_no
+                                                   ) ▶₁ #k )
+                                              case MSSendCodeurlPW
+                                              solve( !BPS_APIv3Key( ~key_APIv3 ) ▶₃ #k )
+                                                case CreateBPS
+                                                solve( Finish( 'BPS', ~session, $bps_id ) @ #l )
+                                                  case BPSReceiveSuccess
+                                                  solve( BPS_State( 'paysuccess', ~session,
+                                                                    <$bps_id, $u_id.1, $pw_id.1, $ms_id.1, 
+                                                                     ~w_sk.1>
+                                                         ) ▶₀ #l )
+                                                    case BPSVerifyPasswordAndConfirmUMS
+                                                    solve( SIn( 'MS-BPS', ~session, $notify_url.1, $bps_id,
+                                                                'Successful'
+                                                           ) ▶₁ #l )
+                                                      case SecureChannelSendRecv
+                                                      solve( SOut( 'MS-BPS', ~session, $notify_url.1, $bps_id,
+                                                                   'Successful'
+                                                             ) ▶₀ #vr.22 )
+                                                        case MSReceiveNotification
+                                                        solve( SOut( 'PW-MS', ~session, $pw_id, $ms_id, ~goods
+                                                               ) ▶₀ #vr.12 )
+                                                          case PWOrderMS
+                                                          solve( SOut( 'PW-MS', ~session, $ms_id, $pw_id,
+                                                                       ~code_url
+                                                                 ) ▶₀ #vr.13 )
+                                                            case MSSendCodeurlPW
+                                                            SOLVED // trace found
+                                                          qed
+                                                        qed
+                                                      qed
+                                                    qed
+                                                  qed
+                                                qed
+                                              qed
+                                            qed
+                                          qed
+                                        qed
+                                      qed
+                                    qed
+                                  qed
+                                qed
+                              qed
+                            qed
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma PS_MS_Order_Injective_Agreement [heuristic={default}]:
+  all-traces
+  "∀ ps ms o #i.
+    (PS_Commit( 'PSAuthMS', ps, ms, o ) @ #i) ⇒
+    (∃ #j.
+      ((MS_Running( 'PSAuthMS', ms, ps, o ) @ #j) ∧ (#j < #i)) ∧
+      (¬(∃ ps2 ms2 #i2.
+          (PS_Commit( 'PSAuthMS', ps2, ms2, o ) @ #i2) ∧ (¬(#i2 = #i)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ps ms o #i.
+  (PS_Commit( 'PSAuthMS', ps, ms, o ) @ #i)
+ ∧
+  ∀ #j.
+   (MS_Running( 'PSAuthMS', ms, ps, o ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨
+    (∃ ps2 ms2 #i2.
+      (PS_Commit( 'PSAuthMS', ps2, ms2, o ) @ #i2) ∧ ¬(#i2 = #i)))"
+*/
+simplify
+solve( BPS_State( 'init', ~session,
+                  <$bps_id, $u_id, $pw_id, $ms_id, ~w_sk>
+       ) ▶₁ #i )
+  case NewPaymentSession
+  solve( SIn( 'MS-BPS', ~session, $ms_id, $bps_id,
+              <
+               <~mch_id, ~nonce, 
+                sign(<~nonce, ~app_id, ~mch_id, description, ~out_trade_no, $notify_url, 
+                      amount>,
+                     x)
+               >, 
+               ~app_id, ~mch_id, description, ~out_trade_no, $notify_url, amount>
+         ) ▶₀ #i )
+    case SecureChannelSendRecv
+    solve( SOut( 'MS-BPS', ~session, $ms_id, $bps_id,
+                 <
+                  <~mch_id, ~nonce, 
+                   sign(<~nonce, ~app_id, ~mch_id, description, ~out_trade_no, $notify_url, 
+                         amount>,
+                        x)
+                  >, 
+                  ~app_id, ~mch_id, description, ~out_trade_no, $notify_url, amount>
+           ) ▶₀ #vr.5 )
+      case MSProcessOrderBPS_case_1
+      solve( !MerchantRegistered( <$ms_id, ~app_id, ~mch_id, pk(~m_sk)>
+             ) ▶₂ #i )
+        case CreateMS
+        solve( BPS_State( 'init', ~session.1,
+                          <$bps_id.1, $u_id.1, $pw_id.1, $ms_id.1, ~w_sk.1>
+               ) ▶₁ #i2 )
+          case NewPaymentSession
+          solve( SIn( 'MS-BPS', ~session.1, $ms_id.1, $bps_id.1,
+                      <
+                       <~mch_id, ~nonce.1, 
+                        sign(<~nonce.1, ~app_id, ~mch_id, gen_desc(~goods), ~out_trade_no, 
+                              $notify_url, calc_amt(~goods)>,
+                             x)
+                       >, 
+                       ~app_id, ~mch_id, gen_desc(~goods), ~out_trade_no, $notify_url, 
+                       calc_amt(~goods)>
+                 ) ▶₀ #i2 )
+            case SecureChannelSendRecv
+            solve( SOut( 'MS-BPS', ~session.1, $ms_id.1, $bps_id.1,
+                         <
+                          <~mch_id, ~nonce.1, 
+                           sign(<~nonce.1, ~app_id, ~mch_id, gen_desc(~goods), ~out_trade_no, 
+                                 $notify_url, calc_amt(~goods)>,
+                                x)
+                          >, 
+                          ~app_id, ~mch_id, gen_desc(~goods), ~out_trade_no, $notify_url, 
+                          calc_amt(~goods)>
+                   ) ▶₀ #vr.12 )
+              case MSProcessOrderBPS
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      qed
+    next
+      case MSProcessOrderBPS_case_2
+      solve( !MerchantRegistered( <$ms_id, ~app_id, ~mch_id, pk(~m_sk)>
+             ) ▶₂ #i )
+        case CreateMS
+        solve( BPS_State( 'init', ~session.1,
+                          <$bps_id.1, $u_id.1, $pw_id.1, $ms_id.1, ~w_sk.1>
+               ) ▶₁ #i2 )
+          case NewPaymentSession
+          solve( SIn( 'MS-BPS', ~session.1, $ms_id.1, $bps_id.1,
+                      <
+                       <~mch_id, ~nonce.1, 
+                        sign(<~nonce.1, ~app_id, ~mch_id, gen_desc(~goods), ~out_trade_no, 
+                              $notify_url, calc_amt(~goods)>,
+                             x)
+                       >, 
+                       ~app_id, ~mch_id, gen_desc(~goods), ~out_trade_no, $notify_url, 
+                       calc_amt(~goods)>
+                 ) ▶₀ #i2 )
+            case SecureChannelSendRecv
+            solve( SOut( 'MS-BPS', ~session.1, $ms_id.1, $bps_id.1,
+                         <
+                          <~mch_id, ~nonce.1, 
+                           sign(<~nonce.1, ~app_id, ~mch_id, gen_desc(~goods), ~out_trade_no, 
+                                 $notify_url, calc_amt(~goods)>,
+                                x)
+                          >, 
+                          ~app_id, ~mch_id, gen_desc(~goods), ~out_trade_no, $notify_url, 
+                          calc_amt(~goods)>
+                   ) ▶₀ #vr.12 )
+              case MSProcessOrderBPS
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma U_MS_Order_Injective_Agreement [heuristic={default}]:
+  all-traces
+  "∀ u ms o #i.
+    (U_Commit( 'UAuthMS', u, ms, o ) @ #i) ⇒
+    (∃ #j.
+      ((MS_Running( 'UAuthMS', ms, u, o ) @ #j) ∧ (#j < #i)) ∧
+      (¬(∃ u2 ms2 #i2.
+          (U_Commit( 'UAuthMS', u2, ms2, o ) @ #i2) ∧ (¬(#i2 = #i)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ u ms o #i.
+  (U_Commit( 'UAuthMS', u, ms, o ) @ #i)
+ ∧
+  ∀ #j.
+   (MS_Running( 'UAuthMS', ms, u, o ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨
+    (∃ u2 ms2 #i2. (U_Commit( 'UAuthMS', u2, ms2, o ) @ #i2) ∧ ¬(#i2 = #i)))"
+*/
+simplify
+solve( U_Commit( 'UAuthMS', u, ms, o ) @ #i )
+  case USubmitPasswordAPA
+  solve( U_State( 'ordered', ~session,
+                  <$u_id, $pw_id, $ms_id, $bps_id, ~password, ~goods>
+         ) ▶₀ #i )
+    case UOpenAndOrderPW
+    solve( SIn( 'U-BPS', ~session, $bps_id, $u_id,
+                <'SReqPwd', calc_amt(~goods), gen_desc(~goods), ~code_url>
+           ) ▶₁ #i )
+      case SecureChannelSendRecv
+      solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                   <'SReqPwd', calc_amt(~goods), gen_desc(~goods), ~code_url>
+             ) ▶₀ #vr.6 )
+        case BPSVerifyPaymentPW_case_1
+        solve( SOut( 'MS-BPS', ~session, $ms_id, $bps_id,
+                     <
+                      <~mch_id, ~nonce, 
+                       sign(<~nonce, ~app_id, ~mch_id, description, ~out_trade_no.1, 
+                             $notify_url.2, amount>,
+                            ~m_sk)
+                      >, 
+                      ~app_id, ~mch_id, description, ~out_trade_no.1, $notify_url.2, amount>
+               ) ▶₀ #vr.12 )
+          case MSProcessOrderBPS_case_1
+          solve( SOut( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url ) ▶₀ #vr.8 )
+            case PWShowBPS_case_2
+            solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                         <'OpenAppAndOrder', ~goods.2>
+                   ) ▶₀ #vr.18 )
+              case UOpenAndOrderPW
+              solve( !UserPassword( <$u_id, ~password> ) ▶₂ #i )
+                case CreateU
+                solve( SOut( 'PW-MS', ~session, $pw_id, $ms_id, ~goods.1 ) ▶₀ #vr.14 )
+                  case PWOrderMS
+                  solve( !KU( calc_amt(~goods) ) @ #vk.1 )
+                    case PaymentQueryOracle_case_1
+                    solve( SOut( 'MS-BPS', ~session.1, $ms_id.2, $bps_id.1,
+                                 <
+                                  <~mch_id.2, ~nonce.1, 
+                                   sign(<~nonce.1, ~app_id.2, ~mch_id.2, gen_desc(~goods), ~out_trade_no.2, 
+                                         $notify_url.2, calc_amt(~goods)>,
+                                        ~m_sk.2)
+                                  >, 
+                                  ~app_id.2, ~mch_id.2, gen_desc(~goods), ~out_trade_no.2, $notify_url.2, 
+                                  calc_amt(~goods)>
+                           ) ▶₀ #vr.22 )
+                      case MSProcessOrderBPS
+                      solve( SOut( 'PW-MS', ~session.1, $pw_id.1, $ms_id.1, ~goods
+                             ) ▶₀ #vr.27 )
+                        case PWOrderMS
+                        solve( SOut( 'U-PW', ~session.1, $u_id.1, $pw_id.1,
+                                     <'OpenAppAndOrder', ~goods>
+                               ) ▶₀ #vr.29 )
+                          case UOpenAndOrderPW
+                          solve( !KU( ~code_url_url ) @ #vk.12 )
+                            case NewPaymentSession
+                            solve( !KU( ~session ) @ #vk.7 )
+                              case NewPaymentSession
+                              solve( !KU( ~code_url ) @ #vk.12 )
+                                case OrderCreateOracle
+                                solve( !KU( gen_desc(~goods) ) @ #vk.6 )
+                                  case PaymentQueryOracle
+                                  SOLVED // trace found
+                                qed
+                              qed
+                            qed
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma MS_PS_Response_Injective_Agreement [heuristic={default}]:
+  all-traces
+  "∀ ms ps o #i.
+    (MS_Commit( 'MSAuthPS', ms, ps, o ) @ #i) ⇒
+    (∃ #j.
+      ((PS_Running( 'MSAuthPS', ps, ms, o ) @ #j) ∧ (#j < #i)) ∧
+      (¬(∃ ms2 ps2 #i2.
+          (MS_Commit( 'MSAuthPS', ms2, ps2, o ) @ #i2) ∧ (¬(#i2 = #i)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ ms ps o #i.
+  (MS_Commit( 'MSAuthPS', ms, ps, o ) @ #i)
+ ∧
+  ∀ #j.
+   (PS_Running( 'MSAuthPS', ps, ms, o ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨
+    (∃ ms2 ps2 #i2.
+      (MS_Commit( 'MSAuthPS', ms2, ps2, o ) @ #i2) ∧ ¬(#i2 = #i)))"
+*/
+simplify
+solve( MS_State( 'sendcodeurl', ~session,
+                 <$ms_id, $pw_id, $u_id, $bps_id, $notify_url, ~app_id, ~mch_id, ~m_sk, 
+                  ~out_trade_no>
+       ) ▶₀ #i )
+  case MSSendCodeurlPW_case_1
+  solve( SIn( 'MS-BPS', ~session, $bps_id, $notify_url,
+              <
+               <~id, 
+                senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                      ~nonce_enc>,
+                     ~key_APIv3), 
+                ~nonce_enc, ~summary>, 
+               sign(<
+                     <~id, 
+                      senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                            ~nonce_enc>,
+                           ~key_APIv3), 
+                      ~nonce_enc, ~summary>, 
+                     ~nonce_sig>,
+                    x), 
+               ~nonce_sig>
+         ) ▶₂ #i )
+    case SecureChannelSendRecv
+    solve( SOut( 'MS-BPS', ~session, $bps_id, $notify_url,
+                 <
+                  <~id, 
+                   senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                         ~nonce_enc>,
+                        ~key_APIv3), 
+                   ~nonce_enc, ~summary>, 
+                  sign(<
+                        <~id, 
+                         senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                               ~nonce_enc>,
+                              ~key_APIv3), 
+                         ~nonce_enc, ~summary>, 
+                        ~nonce_sig>,
+                       x), 
+                  ~nonce_sig>
+           ) ▶₀ #vr.9 )
+      case BPSVerifyPasswordAndConfirmUMS
+      solve( MS_State( 'sendcodeurl', ~session.2,
+                       <$ms_id.2, $pw_id.2, $u_id.2, $bps_id.1, $notify_url.4, ~app_id, 
+                        ~mch_id, ~m_sk.2, ~out_trade_no>
+             ) ▶₀ #i2 )
+        case MSSendCodeurlPW
+        by contradiction /* from formulas */
+      qed
+    qed
+  qed
+next
+  case MSSendCodeurlPW_case_2
+  solve( SIn( 'MS-BPS', ~session, $bps_id, $notify_url,
+              <
+               <~id, 
+                senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                      ~nonce_enc>,
+                     ~key_APIv3), 
+                ~nonce_enc, ~summary>, 
+               sign(<
+                     <~id, 
+                      senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                            ~nonce_enc>,
+                           ~key_APIv3), 
+                      ~nonce_enc, ~summary>, 
+                     ~nonce_sig>,
+                    x), 
+               ~nonce_sig>
+         ) ▶₂ #i )
+    case SecureChannelSendRecv
+    solve( SOut( 'MS-BPS', ~session, $bps_id, $notify_url,
+                 <
+                  <~id, 
+                   senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                         ~nonce_enc>,
+                        ~key_APIv3), 
+                   ~nonce_enc, ~summary>, 
+                  sign(<
+                        <~id, 
+                         senc(<~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, 
+                               ~nonce_enc>,
+                              ~key_APIv3), 
+                         ~nonce_enc, ~summary>, 
+                        ~nonce_sig>,
+                       x), 
+                  ~nonce_sig>
+           ) ▶₀ #vr.9 )
+      case BPSVerifyPasswordAndConfirmUMS
+      solve( MS_State( 'sendcodeurl', ~session.2,
+                       <$ms_id.2, $pw_id.2, $u_id.2, $bps_id.1, $notify_url.4, ~app_id, 
+                        ~mch_id, ~m_sk.2, ~out_trade_no>
+             ) ▶₀ #i2 )
+        case MSSendCodeurlPW
+        by contradiction /* from formulas */
+      qed
+    qed
+  qed
+qed
+
+lemma U_PS_Response_Injective_Agreement [heuristic={default}]:
+  all-traces
+  "∀ u pa r #i.
+    (U_Commit( 'UAuthPS', u, pa, r ) @ #i) ⇒
+    (∃ #j.
+      ((PS_Running( 'UAuthPS', pa, u, r ) @ #j) ∧ (#j < #i)) ∧
+      (¬(∃ u2 pa2 #i2.
+          (U_Commit( 'UAuthPS', u2, pa2, r ) @ #i2) ∧ (¬(#i2 = #i)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ u pa r #i.
+  (U_Commit( 'UAuthPS', u, pa, r ) @ #i)
+ ∧
+  ∀ #j.
+   (PS_Running( 'UAuthPS', pa, u, r ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨
+    (∃ u2 pa2 #i2. (U_Commit( 'UAuthPS', u2, pa2, r ) @ #i2) ∧ ¬(#i2 = #i)))"
+*/
+simplify
+solve( U_Commit( 'UAuthPS', u, pa, r ) @ #i )
+  case UReceiveNotification
+  solve( U_State( 'pwdsubmitted', ~session,
+                  <$u_id, $pw_id, $ms_id, $bps_id, ~password, ~goods>
+         ) ▶₁ #i )
+    case USubmitPasswordAPA
+    solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                 <'SReqPwd', calc_amt(~goods), gen_desc(~goods), ~code_url>
+           ) ▶₀ #vr.2 )
+      case BPSVerifyPaymentPW_case_1
+      solve( SOut( 'MS-BPS', ~session, $ms_id, $bps_id,
+                   <
+                    <~mch_id, ~nonce, 
+                     sign(<~nonce, ~app_id, ~mch_id, description, ~out_trade_no.1, 
+                           $notify_url.2, amount>,
+                          ~m_sk)
+                    >, 
+                    ~app_id, ~mch_id, description, ~out_trade_no.1, $notify_url.2, amount>
+             ) ▶₀ #vr.13 )
+        case MSProcessOrderBPS_case_1
+        solve( SOut( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url ) ▶₀ #vr.9 )
+          case PWShowBPS_case_1
+          solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                       <'OpenAppAndOrder', ~goods.2>
+                 ) ▶₀ #vr.19 )
+            case UOpenAndOrderPW
+            solve( SIn( 'U-BPS', ~session, $bps_id, $u_id,
+                        <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                   ) ▶₀ #i )
+              case SecureChannelSendRecv
+              solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                           <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                     ) ▶₀ #vr.20 )
+                case BPSVerifyPasswordAndConfirmUMS
+                solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                       ) @ #i2 )
+                  case UReceiveNotification
+                  solve( U_State( 'pwdsubmitted', ~session.1,
+                                  <$u_id.1, $pw_id.1, $ms_id.1, $bps_id.1, ~password.1, ~goods>
+                         ) ▶₁ #i2 )
+                    case USubmitPasswordAPA
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          qed
+        next
+          case PWShowBPS_case_2
+          solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                       <'OpenAppAndOrder', ~goods.2>
+                 ) ▶₀ #vr.19 )
+            case UOpenAndOrderPW
+            solve( SIn( 'U-BPS', ~session, $bps_id, $u_id,
+                        <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                   ) ▶₀ #i )
+              case SecureChannelSendRecv
+              solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                           <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                     ) ▶₀ #vr.20 )
+                case BPSVerifyPasswordAndConfirmUMS
+                solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                       ) @ #i2 )
+                  case UReceiveNotification
+                  solve( U_State( 'pwdsubmitted', ~session.1,
+                                  <$u_id.1, $pw_id.1, $ms_id.1, $bps_id.1, ~password.1, ~goods>
+                         ) ▶₁ #i2 )
+                    case USubmitPasswordAPA
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      next
+        case MSProcessOrderBPS_case_2
+        solve( SOut( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url ) ▶₀ #vr.9 )
+          case PWShowBPS_case_1
+          solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                       <'OpenAppAndOrder', ~goods.2>
+                 ) ▶₀ #vr.19 )
+            case UOpenAndOrderPW
+            solve( SIn( 'U-BPS', ~session, $bps_id, $u_id,
+                        <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                   ) ▶₀ #i )
+              case SecureChannelSendRecv
+              solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                           <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                     ) ▶₀ #vr.20 )
+                case BPSVerifyPasswordAndConfirmUMS
+                solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                       ) @ #i2 )
+                  case UReceiveNotification
+                  solve( U_State( 'pwdsubmitted', ~session.1,
+                                  <$u_id.1, $pw_id.1, $ms_id.1, $bps_id.1, ~password.1, ~goods>
+                         ) ▶₁ #i2 )
+                    case USubmitPasswordAPA
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          qed
+        next
+          case PWShowBPS_case_2
+          solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                       <'OpenAppAndOrder', ~goods.2>
+                 ) ▶₀ #vr.19 )
+            case UOpenAndOrderPW
+            solve( SIn( 'U-BPS', ~session, $bps_id, $u_id,
+                        <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                   ) ▶₀ #i )
+              case SecureChannelSendRecv
+              solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                           <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                     ) ▶₀ #vr.20 )
+                case BPSVerifyPasswordAndConfirmUMS
+                solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                       ) @ #i2 )
+                  case UReceiveNotification
+                  solve( U_State( 'pwdsubmitted', ~session.1,
+                                  <$u_id.1, $pw_id.1, $ms_id.1, $bps_id.1, ~password.1, ~goods>
+                         ) ▶₁ #i2 )
+                    case USubmitPasswordAPA
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    next
+      case BPSVerifyPaymentPW_case_2
+      solve( SOut( 'MS-BPS', ~session.1, $ms_id.1, $bps_id,
+                   <
+                    <~mch_id.1, ~nonce, 
+                     sign(<~nonce, ~app_id.1, ~mch_id.1, gen_desc(~goods), ~out_trade_no, 
+                           $notify_url.1, calc_amt(~goods)>,
+                          ~m_sk.1)
+                    >, 
+                    ~app_id.1, ~mch_id.1, gen_desc(~goods), ~out_trade_no, $notify_url.1, 
+                    calc_amt(~goods)>
+             ) ▶₀ #vr.12 )
+        case MSProcessOrderBPS_case_1
+        solve( SOut( 'MS-BPS', ~session, $ms_id, $bps_id,
+                     <
+                      <~mch_id, ~nonce.1, 
+                       sign(<~nonce.1, ~app_id, ~mch_id, description, ~out_trade_no.1, 
+                             $notify_url.2, amount>,
+                            ~m_sk)
+                      >, 
+                      ~app_id, ~mch_id, description, ~out_trade_no.1, $notify_url.2, amount>
+               ) ▶₀ #vr.15 )
+          case MSProcessOrderBPS_case_1
+          solve( SOut( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url ) ▶₀ #vr.9 )
+            case PWShowBPS_case_1
+            solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                         <'OpenAppAndOrder', ~goods.2>
+                   ) ▶₀ #vr.25 )
+              case UOpenAndOrderPW
+              solve( SIn( 'U-BPS', ~session, $bps_id, $u_id,
+                          <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                     ) ▶₀ #i )
+                case SecureChannelSendRecv
+                solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                             <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                       ) ▶₀ #vr.26 )
+                  case BPSVerifyPasswordAndConfirmUMS
+                  solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                         ) @ #i2 )
+                    case UReceiveNotification
+                    solve( U_State( 'pwdsubmitted', ~session.1,
+                                    <$u_id.1, $pw_id.1, $ms_id.1, $bps_id.1, ~password.1, ~goods>
+                           ) ▶₁ #i2 )
+                      case USubmitPasswordAPA
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          next
+            case PWShowBPS_case_2
+            solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                         <'OpenAppAndOrder', ~goods.2>
+                   ) ▶₀ #vr.25 )
+              case UOpenAndOrderPW
+              solve( SIn( 'U-BPS', ~session, $bps_id, $u_id,
+                          <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                     ) ▶₀ #i )
+                case SecureChannelSendRecv
+                solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                             <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                       ) ▶₀ #vr.26 )
+                  case BPSVerifyPasswordAndConfirmUMS
+                  solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                         ) @ #i2 )
+                    case UReceiveNotification
+                    solve( U_State( 'pwdsubmitted', ~session.1,
+                                    <$u_id.1, $pw_id.1, $ms_id.1, $bps_id.1, ~password.1, ~goods>
+                           ) ▶₁ #i2 )
+                      case USubmitPasswordAPA
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        next
+          case MSProcessOrderBPS_case_2
+          solve( SOut( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url ) ▶₀ #vr.9 )
+            case PWShowBPS_case_1
+            solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                         <'OpenAppAndOrder', ~goods.2>
+                   ) ▶₀ #vr.25 )
+              case UOpenAndOrderPW
+              solve( SIn( 'U-BPS', ~session, $bps_id, $u_id,
+                          <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                     ) ▶₀ #i )
+                case SecureChannelSendRecv
+                solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                             <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                       ) ▶₀ #vr.26 )
+                  case BPSVerifyPasswordAndConfirmUMS
+                  solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                         ) @ #i2 )
+                    case UReceiveNotification
+                    solve( U_State( 'pwdsubmitted', ~session.1,
+                                    <$u_id.1, $pw_id.1, $ms_id.1, $bps_id.1, ~password.1, ~goods>
+                           ) ▶₁ #i2 )
+                      case USubmitPasswordAPA
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          next
+            case PWShowBPS_case_2
+            solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                         <'OpenAppAndOrder', ~goods.2>
+                   ) ▶₀ #vr.25 )
+              case UOpenAndOrderPW
+              solve( SIn( 'U-BPS', ~session, $bps_id, $u_id,
+                          <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                     ) ▶₀ #i )
+                case SecureChannelSendRecv
+                solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                             <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                       ) ▶₀ #vr.26 )
+                  case BPSVerifyPasswordAndConfirmUMS
+                  solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                         ) @ #i2 )
+                    case UReceiveNotification
+                    solve( U_State( 'pwdsubmitted', ~session.1,
+                                    <$u_id.1, $pw_id.1, $ms_id.1, $bps_id.1, ~password.1, ~goods>
+                           ) ▶₁ #i2 )
+                      case USubmitPasswordAPA
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      next
+        case MSProcessOrderBPS_case_2
+        solve( SOut( 'MS-BPS', ~session, $ms_id, $bps_id,
+                     <
+                      <~mch_id, ~nonce.1, 
+                       sign(<~nonce.1, ~app_id, ~mch_id, description, ~out_trade_no.1, 
+                             $notify_url.2, amount>,
+                            ~m_sk)
+                      >, 
+                      ~app_id, ~mch_id, description, ~out_trade_no.1, $notify_url.2, amount>
+               ) ▶₀ #vr.15 )
+          case MSProcessOrderBPS_case_1
+          solve( SOut( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url ) ▶₀ #vr.9 )
+            case PWShowBPS_case_1
+            solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                         <'OpenAppAndOrder', ~goods.2>
+                   ) ▶₀ #vr.25 )
+              case UOpenAndOrderPW
+              solve( SIn( 'U-BPS', ~session, $bps_id, $u_id,
+                          <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                     ) ▶₀ #i )
+                case SecureChannelSendRecv
+                solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                             <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                       ) ▶₀ #vr.26 )
+                  case BPSVerifyPasswordAndConfirmUMS
+                  solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                         ) @ #i2 )
+                    case UReceiveNotification
+                    solve( U_State( 'pwdsubmitted', ~session.1,
+                                    <$u_id.1, $pw_id.1, $ms_id.1, $bps_id.1, ~password.1, ~goods>
+                           ) ▶₁ #i2 )
+                      case USubmitPasswordAPA
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          next
+            case PWShowBPS_case_2
+            solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                         <'OpenAppAndOrder', ~goods.2>
+                   ) ▶₀ #vr.25 )
+              case UOpenAndOrderPW
+              solve( SIn( 'U-BPS', ~session, $bps_id, $u_id,
+                          <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                     ) ▶₀ #i )
+                case SecureChannelSendRecv
+                solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                             <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                       ) ▶₀ #vr.26 )
+                  case BPSVerifyPasswordAndConfirmUMS
+                  solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                         ) @ #i2 )
+                    case UReceiveNotification
+                    solve( U_State( 'pwdsubmitted', ~session.1,
+                                    <$u_id.1, $pw_id.1, $ms_id.1, $bps_id.1, ~password.1, ~goods>
+                           ) ▶₁ #i2 )
+                      case USubmitPasswordAPA
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        next
+          case MSProcessOrderBPS_case_2
+          solve( SOut( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url ) ▶₀ #vr.9 )
+            case PWShowBPS_case_1
+            solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                         <'OpenAppAndOrder', ~goods.2>
+                   ) ▶₀ #vr.25 )
+              case UOpenAndOrderPW
+              solve( SIn( 'U-BPS', ~session, $bps_id, $u_id,
+                          <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                     ) ▶₀ #i )
+                case SecureChannelSendRecv
+                solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                             <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                       ) ▶₀ #vr.26 )
+                  case BPSVerifyPasswordAndConfirmUMS
+                  solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                         ) @ #i2 )
+                    case UReceiveNotification
+                    solve( U_State( 'pwdsubmitted', ~session.1,
+                                    <$u_id.1, $pw_id.1, $ms_id.1, $bps_id.1, ~password.1, ~goods>
+                           ) ▶₁ #i2 )
+                      case USubmitPasswordAPA
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          next
+            case PWShowBPS_case_2
+            solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                         <'OpenAppAndOrder', ~goods.2>
+                   ) ▶₀ #vr.25 )
+              case UOpenAndOrderPW
+              solve( SIn( 'U-BPS', ~session, $bps_id, $u_id,
+                          <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                     ) ▶₀ #i )
+                case SecureChannelSendRecv
+                solve( SOut( 'U-BPS', ~session, $bps_id, $u_id,
+                             <'PaymentSuccessful', calc_amt(~goods), gen_desc(~goods)>
+                       ) ▶₀ #vr.26 )
+                  case BPSVerifyPasswordAndConfirmUMS
+                  solve( U_Commit( 'UAuthPS', u2, pa2, <calc_amt(~goods), gen_desc(~goods)>
+                         ) @ #i2 )
+                    case UReceiveNotification
+                    solve( U_State( 'pwdsubmitted', ~session.1,
+                                    <$u_id.1, $pw_id.1, $ms_id.1, $bps_id.1, ~password.1, ~goods>
+                           ) ▶₁ #i2 )
+                      case USubmitPasswordAPA
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma No_Payment_Without_Password_Input [heuristic={default}]:
+  all-traces
+  "∀ u p s #i.
+    (PaymentComplete( u, h(p), s ) @ #i) ⇒
+    (∃ #j.
+      ((UserInputPwd( u, p, s ) @ #j) ∧ (#j < #i)) ∧
+      (¬(∃ u2 p2 #i2.
+          (PaymentComplete( u2, h(p2), s ) @ #i2) ∧ (¬(#i2 = #i)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ u p s #i.
+  (PaymentComplete( u, h(p), s ) @ #i)
+ ∧
+  ∀ #j.
+   (UserInputPwd( u, p, s ) @ #j)
+  ⇒
+   ((¬(#j < #i)) ∨
+    (∃ u2 p2 #i2. (PaymentComplete( u2, h(p2), s ) @ #i2) ∧ ¬(#i2 = #i)))"
+*/
+simplify
+solve( BPS_State( 'waitpwd', ~session,
+                  <$bps_id, $u_id, $pw_id, $ms_id, ~w_sk, ~code_url, ~out_trade_no, 
+                   amount, description>
+       ) ▶₁ #i )
+  case BPSVerifyPaymentPW_case_1
+  solve( SOut( 'MS-BPS', ~session, $ms_id, $bps_id,
+               <
+                <~mch_id.2, ~nonce, 
+                 sign(<~nonce, ~app_id.2, ~mch_id.2, description.1, ~out_trade_no.1, 
+                       $notify_url.2, amount.1>,
+                      ~m_sk.1)
+                >, 
+                ~app_id.2, ~mch_id.2, description.1, ~out_trade_no.1, $notify_url.2, 
+                amount.1>
+         ) ▶₀ #vr.5 )
+    case MSProcessOrderBPS_case_1
+    solve( SOut( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url ) ▶₀ #vr.1 )
+      case PWShowBPS_case_1
+      solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                   <'OpenAppAndOrder', ~goods.1>
+             ) ▶₀ #vr.16 )
+        case UOpenAndOrderPW
+        solve( SIn( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #i )
+          case SecureChannelSendRecv
+          solve( SOut( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #vr.18 )
+            case USubmitPasswordAPA
+            solve( BPS_State( 'waitpwd', ~session,
+                              <$bps_id.1, $u_id.1, $pw_id.1, $ms_id.2, ~w_sk.1, ~code_url.3, 
+                               ~out_trade_no.2, amount.1, description.1>
+                   ) ▶₁ #i2 )
+              case BPSVerifyPaymentPW
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      qed
+    next
+      case PWShowBPS_case_2
+      solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                   <'OpenAppAndOrder', ~goods.1>
+             ) ▶₀ #vr.16 )
+        case UOpenAndOrderPW
+        solve( SIn( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #i )
+          case SecureChannelSendRecv
+          solve( SOut( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #vr.18 )
+            case USubmitPasswordAPA
+            solve( BPS_State( 'waitpwd', ~session,
+                              <$bps_id.1, $u_id.1, $pw_id.1, $ms_id.2, ~w_sk.1, ~code_url.3, 
+                               ~out_trade_no.2, amount.1, description.1>
+                   ) ▶₁ #i2 )
+              case BPSVerifyPaymentPW
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      qed
+    qed
+  next
+    case MSProcessOrderBPS_case_2
+    solve( SOut( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url ) ▶₀ #vr.1 )
+      case PWShowBPS_case_1
+      solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                   <'OpenAppAndOrder', ~goods.1>
+             ) ▶₀ #vr.16 )
+        case UOpenAndOrderPW
+        solve( SIn( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #i )
+          case SecureChannelSendRecv
+          solve( SOut( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #vr.18 )
+            case USubmitPasswordAPA
+            solve( BPS_State( 'waitpwd', ~session,
+                              <$bps_id.1, $u_id.1, $pw_id.1, $ms_id.2, ~w_sk.1, ~code_url.3, 
+                               ~out_trade_no.2, amount.1, description.1>
+                   ) ▶₁ #i2 )
+              case BPSVerifyPaymentPW
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      qed
+    next
+      case PWShowBPS_case_2
+      solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                   <'OpenAppAndOrder', ~goods.1>
+             ) ▶₀ #vr.16 )
+        case UOpenAndOrderPW
+        solve( SIn( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #i )
+          case SecureChannelSendRecv
+          solve( SOut( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #vr.18 )
+            case USubmitPasswordAPA
+            solve( BPS_State( 'waitpwd', ~session,
+                              <$bps_id.1, $u_id.1, $pw_id.1, $ms_id.2, ~w_sk.1, ~code_url.3, 
+                               ~out_trade_no.2, amount.1, description.1>
+                   ) ▶₁ #i2 )
+              case BPSVerifyPaymentPW
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+next
+  case BPSVerifyPaymentPW_case_2
+  solve( SOut( 'MS-BPS', ~session.1, $ms_id.1, $bps_id,
+               <
+                <~mch_id.1, ~nonce, 
+                 sign(<~nonce, ~app_id.1, ~mch_id.1, description, ~out_trade_no, 
+                       $notify_url.1, amount>,
+                      ~m_sk)
+                >, 
+                ~app_id.1, ~mch_id.1, description, ~out_trade_no, $notify_url.1, amount>
+         ) ▶₀ #vr.4 )
+    case MSProcessOrderBPS_case_1
+    solve( SOut( 'MS-BPS', ~session, $ms_id, $bps_id,
+                 <
+                  <~mch_id.2, ~nonce.1, 
+                   sign(<~nonce.1, ~app_id.2, ~mch_id.2, description, ~out_trade_no.1, 
+                         $notify_url.2, amount>,
+                        ~m_sk.1)
+                  >, 
+                  ~app_id.2, ~mch_id.2, description, ~out_trade_no.1, $notify_url.2, amount
+                 >
+           ) ▶₀ #vr.7 )
+      case MSProcessOrderBPS_case_1
+      solve( SOut( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url ) ▶₀ #vr.1 )
+        case PWShowBPS_case_1
+        solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                     <'OpenAppAndOrder', ~goods.2>
+               ) ▶₀ #vr.22 )
+          case UOpenAndOrderPW
+          solve( SIn( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #i )
+            case SecureChannelSendRecv
+            solve( SOut( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #vr.24 )
+              case USubmitPasswordAPA
+              solve( BPS_State( 'waitpwd', ~session,
+                                <$bps_id.1, $u_id.2, $pw_id.2, $ms_id.2, ~w_sk.1, ~code_url.3, 
+                                 ~out_trade_no.2, amount, description>
+                     ) ▶₁ #i2 )
+                case BPSVerifyPaymentPW
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        qed
+      next
+        case PWShowBPS_case_2
+        solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                     <'OpenAppAndOrder', ~goods.2>
+               ) ▶₀ #vr.22 )
+          case UOpenAndOrderPW
+          solve( SIn( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #i )
+            case SecureChannelSendRecv
+            solve( SOut( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #vr.24 )
+              case USubmitPasswordAPA
+              solve( BPS_State( 'waitpwd', ~session,
+                                <$bps_id.1, $u_id.2, $pw_id.2, $ms_id.2, ~w_sk.1, ~code_url.3, 
+                                 ~out_trade_no.2, amount, description>
+                     ) ▶₁ #i2 )
+                case BPSVerifyPaymentPW
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        qed
+      qed
+    next
+      case MSProcessOrderBPS_case_2
+      solve( SOut( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url ) ▶₀ #vr.1 )
+        case PWShowBPS_case_1
+        solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                     <'OpenAppAndOrder', ~goods.2>
+               ) ▶₀ #vr.22 )
+          case UOpenAndOrderPW
+          solve( SIn( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #i )
+            case SecureChannelSendRecv
+            solve( SOut( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #vr.24 )
+              case USubmitPasswordAPA
+              solve( BPS_State( 'waitpwd', ~session,
+                                <$bps_id.1, $u_id.2, $pw_id.2, $ms_id.2, ~w_sk.1, ~code_url.3, 
+                                 ~out_trade_no.2, amount, description>
+                     ) ▶₁ #i2 )
+                case BPSVerifyPaymentPW
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        qed
+      next
+        case PWShowBPS_case_2
+        solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                     <'OpenAppAndOrder', ~goods.2>
+               ) ▶₀ #vr.22 )
+          case UOpenAndOrderPW
+          solve( SIn( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #i )
+            case SecureChannelSendRecv
+            solve( SOut( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #vr.24 )
+              case USubmitPasswordAPA
+              solve( BPS_State( 'waitpwd', ~session,
+                                <$bps_id.1, $u_id.2, $pw_id.2, $ms_id.2, ~w_sk.1, ~code_url.3, 
+                                 ~out_trade_no.2, amount, description>
+                     ) ▶₁ #i2 )
+                case BPSVerifyPaymentPW
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  next
+    case MSProcessOrderBPS_case_2
+    solve( SOut( 'MS-BPS', ~session, $ms_id, $bps_id,
+                 <
+                  <~mch_id.2, ~nonce.1, 
+                   sign(<~nonce.1, ~app_id.2, ~mch_id.2, description, ~out_trade_no.1, 
+                         $notify_url.2, amount>,
+                        ~m_sk.1)
+                  >, 
+                  ~app_id.2, ~mch_id.2, description, ~out_trade_no.1, $notify_url.2, amount
+                 >
+           ) ▶₀ #vr.7 )
+      case MSProcessOrderBPS_case_1
+      solve( SOut( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url ) ▶₀ #vr.1 )
+        case PWShowBPS_case_1
+        solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                     <'OpenAppAndOrder', ~goods.2>
+               ) ▶₀ #vr.22 )
+          case UOpenAndOrderPW
+          solve( SIn( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #i )
+            case SecureChannelSendRecv
+            solve( SOut( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #vr.24 )
+              case USubmitPasswordAPA
+              solve( BPS_State( 'waitpwd', ~session,
+                                <$bps_id.1, $u_id.2, $pw_id.2, $ms_id.2, ~w_sk.1, ~code_url.3, 
+                                 ~out_trade_no.2, amount, description>
+                     ) ▶₁ #i2 )
+                case BPSVerifyPaymentPW
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        qed
+      next
+        case PWShowBPS_case_2
+        solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                     <'OpenAppAndOrder', ~goods.2>
+               ) ▶₀ #vr.22 )
+          case UOpenAndOrderPW
+          solve( SIn( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #i )
+            case SecureChannelSendRecv
+            solve( SOut( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #vr.24 )
+              case USubmitPasswordAPA
+              solve( BPS_State( 'waitpwd', ~session,
+                                <$bps_id.1, $u_id.2, $pw_id.2, $ms_id.2, ~w_sk.1, ~code_url.3, 
+                                 ~out_trade_no.2, amount, description>
+                     ) ▶₁ #i2 )
+                case BPSVerifyPaymentPW
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        qed
+      qed
+    next
+      case MSProcessOrderBPS_case_2
+      solve( SOut( 'PW-BPS', ~session, $pw_id, $bps_id, ~code_url ) ▶₀ #vr.1 )
+        case PWShowBPS_case_1
+        solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                     <'OpenAppAndOrder', ~goods.2>
+               ) ▶₀ #vr.22 )
+          case UOpenAndOrderPW
+          solve( SIn( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #i )
+            case SecureChannelSendRecv
+            solve( SOut( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #vr.24 )
+              case USubmitPasswordAPA
+              solve( BPS_State( 'waitpwd', ~session,
+                                <$bps_id.1, $u_id.2, $pw_id.2, $ms_id.2, ~w_sk.1, ~code_url.3, 
+                                 ~out_trade_no.2, amount, description>
+                     ) ▶₁ #i2 )
+                case BPSVerifyPaymentPW
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        qed
+      next
+        case PWShowBPS_case_2
+        solve( SOut( 'U-PW', ~session, $u_id, $pw_id,
+                     <'OpenAppAndOrder', ~goods.2>
+               ) ▶₀ #vr.22 )
+          case UOpenAndOrderPW
+          solve( SIn( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #i )
+            case SecureChannelSendRecv
+            solve( SOut( 'U-BPS', ~session, $u_id, $bps_id, ~password ) ▶₀ #vr.24 )
+              case USubmitPasswordAPA
+              solve( BPS_State( 'waitpwd', ~session,
+                                <$bps_id.1, $u_id.2, $pw_id.2, $ms_id.2, ~w_sk.1, ~code_url.3, 
+                                 ~out_trade_no.2, amount, description>
+                     ) ▶₁ #i2 )
+                case BPSVerifyPaymentPW
+                by contradiction /* from formulas */
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* All wellformedness checks were successful. */
+
+/*
+Generated from:
+Tamarin version 1.10.0
+Maude version 3.1
+Git revision: cb62c305f8c8b8c1e664152aa33c95b7b8d5ef32, branch: master
+Compiled at: 2024-10-30 11:11:02.432289291 UTC
+*/
+
+end
+==============================================================================
+summary of summaries:
+
+analyzed: /root/models/secure_ps_channel/psp_b_pay_native.spthy
+
+  output:          /root/results/secure_ps_channel/psp_b_pay_native.spthy
+  processing time: 16.76s
+  
+  typing (all-traces): verified (17 steps)
+  executable (exists-trace): verified (32 steps)
+  PS_MS_Order_Injective_Agreement (all-traces): verified (14 steps)
+  U_MS_Order_Injective_Agreement (all-traces): falsified - found trace (19 steps)
+  MS_PS_Response_Injective_Agreement (all-traces): verified (10 steps)
+  U_PS_Response_Injective_Agreement (all-traces): verified (86 steps)
+  No_Payment_Without_Password_Input (all-traces): verified (72 steps)
+
+==============================================================================

@@ -2,6 +2,13 @@
 
 This repository contains formal models and verification scripts for analyzing the security of third-party online payments. In total, six real-world payment protocols are modeled and analyzed in this project, as summarized in the table below.
 
+## Publication
+
+This repository is the artifact of the following paper:
+
+> **When Authorization Loses Its Meaning: Breaking and Fixing Third-Party Online Payments**
+> Accepted to appear at the *35th USENIX Security Symposium (USENIX Security 2026)*.
+
 | Payment Scenario | Alipay                                                       | PSP-B Pay                                                    |
 | ---------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | **In App**       | **Model:** `alipay_app.spthy`<br>**Official Document:** [APP](https://opendocs.alipay.com/open/00dn73?pathHash=b91b9616) | **Model:** `psp_b_pay_app.spthy` |

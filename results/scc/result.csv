@@ -1,0 +1,8 @@
+model,case,time,lemma,type,result,steps
+scc,scc_order.spthy,454.94s,typing,all-traces,verified,39
+scc,scc_order.spthy,454.94s,executable,exists-trace,verified,30
+scc,scc_order.spthy,454.94s,PS_MS_Order_Injective_Agreement,all-traces,verified,17
+scc,scc_order.spthy,454.94s,U_MS_Order_Injective_Agreement,all-traces,verified,5822
+scc,scc_order.spthy,454.94s,MS_PS_Response_Injective_Agreement,all-traces,verified,7180
+scc,scc_order.spthy,454.94s,U_PS_Response_Injective_Agreement,all-traces,verified,6062
+scc,scc_order.spthy,454.94s,No_Payment_Without_Password_Input,all-traces,verified,3271

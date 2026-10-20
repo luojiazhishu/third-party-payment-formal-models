@@ -4,10 +4,13 @@ This repository contains formal models and verification scripts for analyzing th
 
 ## Publication
 
-This repository is the artifact of the following paper:
+This repository is the artifact of the following papers:
 
 > **When Authorization Loses Its Meaning: Breaking and Fixing Third-Party Online Payments**
 > Accepted to appear at the *35th USENIX Security Symposium (USENIX Security 2026)*.
+
+> **Formal Analysis and Fixing of Third-Party Online Payment Protocols**
+> Extended journal version (under review). It replaces the countermeasure of the conference version, which relies on trust on first use, with *Sealed Checkout Code* (SCC).
 
 | Payment Scenario | Alipay                                                       | PSP-B Pay                                                    |
 | ---------------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
@@ -21,7 +24,9 @@ This repository is the artifact of the following paper:
   1. `base` — Both MF ⇐⇒ MS and MF ⇐⇒ PS are insecure  
   2. `secure_ms_channel` — Only MF ⇐⇒ PS is insecure  
   3. `secure_ps_channel` — Only MF ⇐⇒ MS is insecure  
-  4. `countermeasures` — Countermeasure formal models  
+  4. `countermeasures` — Countermeasure formal models of the conference version  
+  5. `scc` — Sealed Checkout Code (SCC), the countermeasure of the journal version, under the `base` assumption  
+  6. `control_commit_point` — Control experiment: the six protocol models under the three channel assumptions, with the user's commit for `U_MS_Order_Injective_Agreement` moved to the receipt of the payment result, as in the SCC model  
 - `./scripts/` — Scripts for model verification and attack-graph generation  
 - `./results/` — Formal verification results produced by Tamarin Prover  
 
@@ -74,3 +79,10 @@ To view graphs, run Tamarin in **interactive mode** on a specific results subfol
 ```bash
 tamarin-prover interactive --derivcheck-timeout=0 ./results/base
 ```
+
+### SCC and control experiment
+
+- `results/scc/` — All five security properties of SCC (`PS_MS_Order_Injective_Agreement`, `U_MS_Order_Injective_Agreement`, `MS_PS_Response_Injective_Agreement`, `U_PS_Response_Injective_Agreement`, `No_Payment_Without_Password_Input`) are verified under the `base` assumption, in which both external channels are insecure.
+- `results/control_commit_point/` — `U_MS_Order_Injective_Agreement` remains falsified in all 18 models, so moving the commit point does not by itself make the property hold.
+
+These two folders contain the result summaries (`result.json`, `result.csv`) produced by Tamarin 1.10.0. To reproduce the proofs and traces, run `make all`.

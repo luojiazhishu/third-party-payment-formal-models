@@ -1,0 +1,49 @@
+{
+    "scc_order.spthy": {
+        "time": "454.94s",
+        "lemmas": [
+            {
+                "name": "typing",
+                "type": "all-traces",
+                "result": "verified",
+                "steps": "39"
+            },
+            {
+                "name": "executable",
+                "type": "exists-trace",
+                "result": "verified",
+                "steps": "30"
+            },
+            {
+                "name": "PS_MS_Order_Injective_Agreement",
+                "type": "all-traces",
+                "result": "verified",
+                "steps": "17"
+            },
+            {
+                "name": "U_MS_Order_Injective_Agreement",
+                "type": "all-traces",
+                "result": "verified",
+                "steps": "5822"
+            },
+            {
+                "name": "MS_PS_Response_Injective_Agreement",
+                "type": "all-traces",
+                "result": "verified",
+                "steps": "7180"
+            },
+            {
+                "name": "U_PS_Response_Injective_Agreement",
+                "type": "all-traces",
+                "result": "verified",
+                "steps": "6062"
+            },
+            {
+                "name": "No_Payment_Without_Password_Input",
+                "type": "all-traces",
+                "result": "verified",
+                "steps": "3271"
+            }
+        ]
+    }
+}

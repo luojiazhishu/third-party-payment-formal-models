@@ -1,0 +1,593 @@
+theory Alipay_APP_Model
+begin
+
+heuristic: S
+builtins: signing, hashing
+functions: gen_desc/1, calc_amt/1
+
+/*
+* ****************************************************************
+* Role: 
+*   - U (User) 
+*   - MA (Merchant Application)
+*   - MS (Merchant Server)
+*   - APA (Alipay Payment Application)
+*   - APS (Alipay Payment Server)
+* Secure Communication Channels:
+*   1. U <------> MA, ch_id: "U-MA"
+*   2. U <-----> APA, ch_id: "U-APA"
+*   3. MS <----> APS, ch_id: "MS-APS"
+*   4. APA <---> APS, ch_id: "APA-APS"
+* Insecure Communication Channels:
+*   1. MA <----> MS, ch_id: "MA-MS"
+*   2. MA <---> APA, ch_id: "MA-APA"
+* Colors:
+*   - U: #c5f3c3
+*   - MA: #f3c3c7
+*   - MS: #f3ccc3
+*   - APA: #c4c3f3
+*   - APS: #d3c3f3
+*   - Secure Channel: #f0f5e5
+*   - Break Integrity: #f25a47
+*   - Break Confidentiality: #fccb16
+*   - Initialization: #d0deaa
+*   - Oracle: #f9d27d
+* ****************************************************************
+*/
+
+/*
+* ****************************************************************
+*   Tactics           
+* ****************************************************************
+*/
+  tactic: default
+    presort: S
+    prio:
+      regex ".*Commit.*"
+    prio:
+      regex ".*!KU\(.*m_sk.*"
+    prio:
+      regex ".*m_sk.*"
+    prio:
+      regex ".*_State.*"
+    prio:
+      regex ".*sign.*"
+    prio:
+      regex ".*APS_PubKey.*"
+    prio:
+      regex ".*SOut\(.*U-.*"
+    prio:
+      regex ".*SOut\(.*-APS.*"
+    prio:
+      regex ".*SIn\(.*U-.*"
+    prio:
+      regex ".*SIn\(.*-APS.*"
+
+  tactic: typing
+    presort: S
+    prio:
+      regex ".*!KU\(\s*sign.*"
+    prio:
+      regex ".*SOURCE_.*"
+    prio:
+      regex ".*APS_PubKey.*"
+    prio:
+      regex ".*SOut\(.*U-.*"
+    prio:
+      regex ".*SOut\(.*-APS.*"
+    prio:
+      regex ".*SIn\(.*U-.*"
+    prio:
+      regex ".*SIn\(.*-APS.*"
+    prio:
+      regex ".*_State.*"
+    deprio:
+      regex ".*SOut*"
+    deprio:
+      regex ".*SIn*"
+
+ 
+/*
+* ****************************************************************
+*   Restrictions           
+* ****************************************************************
+*/
+  restriction OnlyOnceV:
+    "
+    All x #i #j. OnlyOnceV(x)@#i & OnlyOnceV(x)@#j ==> #i = #j
+    "
+  restriction Equality:
+    "All x y #i. Eq(x,y) @#i ==> x = y"
+
+  restriction Inequality:
+    "All x #i. Neq(x,x) @i ==> F"
+
+  restriction InsecureChannel:
+    "
+    All ch_id #i. InsecureChannel(ch_id) @#i ==>
+      (ch_id = 'MA-MS')
+    "
+
+/*
+* ****************************************************************
+*   Secure Communication Channels
+* ****************************************************************
+*/
+  rule SecureChannelSendRecv[color=f0f5e5]:
+    [
+      SOut(ch_id, ~session, $src, $dst, msg)
+    ]
+    --[
+      Neq($src, $dst)
+    ]->
+    [
+      SIn(ch_id, ~session, $src, $dst, msg)
+    ]
+
+  rule breakChannelConfidentiality[color=fccb16]:
+    [
+      SOut(ch_id, ~session, $src, $dst, msg)
+    ]
+    --[
+      OnlyOnceV(<$src, $dst, msg>),
+      BreakChannelCon(ch_id),
+      InsecureChannel(ch_id),
+      SOURCE_IN_FACT_BkChaCon(ch_id, ~session, $src, $dst, msg)
+    ]->
+    [
+      SOut(ch_id, ~session, $src, $dst, msg),
+      Out(<$src, $dst, msg>)
+    ]
+
+  rule breakChannelIntegrity[color=f25a47]:
+    [
+      In(<ch_id, ~session, $src, $dst, msg>)
+    ]
+    --[
+      BreakChannelInt(ch_id),
+      InsecureChannel(ch_id),
+      SOURCE_OUT_FACT_BkChaInt(ch_id, ~session, $src, $dst, msg)
+    ]->
+    [
+      SIn(ch_id, ~session, $src, $dst, msg)
+    ]
+
+/*
+* ****************************************************************
+*   Oracle
+* ****************************************************************
+*/
+  rule OrderCreateOracle[color=f9d27d]:
+    let 
+      biz_content = <~out_trade_no, total_amount, subject>
+      m_sig = sign(<~app_id, biz_content, $notify_url>, ~m_sk)
+      order_str = <~app_id, biz_content, $notify_url, m_sig>
+    in
+    [
+      Fr(~out_trade_no),
+      In(<total_amount, subject>),
+      !MerchantCreated(<$ms_id, ~app_id, $notify_url, ~m_sk>),
+    ]
+    -->
+    [
+      Out(order_str),
+      !MS_Database($ms_id, $attacker, biz_content, ~out_trade_no)
+    ]
+
+  rule PaymentQueryOracle[color=f9d27d]:
+    let
+      biz_content = <~out_trade_no, total_amount, subject>
+    in
+    [
+      In(biz_content),
+      !APS_Database($aps_id, biz_content, ~out_trade_no)
+    ]
+    --[]->
+    [
+      Out(<total_amount, subject>)
+    ]
+/*
+* ****************************************************************
+*   Initialization
+* ****************************************************************
+*/
+  rule CreateAPS[color=d3c3f3]:
+    [
+      Fr(~a_sk)
+    ]
+    --[ 
+      OnlyOnceV('APS') // Only one instance of APS
+    ]->
+    [
+      !APS_PriKey(~a_sk),
+      !APS_PubKey(pk(~a_sk))
+    ]
+
+  rule CreateAPA[color=c4c3f3]:
+    []
+    --[ OnlyOnceV(<'APA', $apa_id>) ]->
+    [
+      APA_State('created', 'null', <$apa_id>)
+    ]
+
+  rule CreateMA[color=f3c3c7]:
+    []
+    --[ OnlyOnceV(<'MA', $ma_id>) ]->
+    [
+      MA_State('created', 'null', <$ma_id>)
+    ]
+
+  rule CreateU[color=c5f3c3]:
+    [   
+      Fr(~password)
+    ]
+    --[ OnlyOnceV(<'U'>) ]->
+    [
+      !UserRegistered(<$u_id, h(~password)>),
+      !UserPassword(<$u_id, ~password>)
+    ]
+
+  rule CreateMS[color=f3ccc3]:
+    [   
+      Fr(~app_id),
+      Fr(~m_sk)
+    ]
+    --[
+      OnlyOnceV(<'MS', $ms_id>) 
+    ]->
+    [
+      !MerchantRegistered(<$ms_id, ~app_id, pk(~m_sk)>),
+      !MerchantCreated(<$ms_id, ~app_id, $notify_url, ~m_sk>),
+    ]
+
+  rule NewPaymentSession[color=d0deaa]:
+    [
+      Fr(~session), 
+      !APS_PriKey(~a_sk),
+      !UserPassword(<$u_id, ~password>),
+      !MerchantCreated(<$ms_id, ~app_id, $notify_url, ~m_sk>),
+      MA_State('created', 'null', <$ma_id>),
+      APA_State('created', 'null', <$apa_id>)
+    ]
+    --[
+      Start(~session, $u_id, $ma_id, $ms_id, $apa_id, $aps_id)
+    ]->
+    [
+      U_State('init', ~session, <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password>),
+      MA_State('init', ~session, <$ma_id, $u_id, $ms_id, $apa_id>),
+      MS_State('init', ~session, <$ms_id, $notify_url, $ma_id, $u_id, $apa_id, $aps_id, ~app_id, ~m_sk>),
+      APA_State('init', ~session, <$apa_id, $u_id, $ma_id, $ms_id, $aps_id>),
+      APS_State('init', ~session, <$aps_id, $apa_id, $ms_id, ~a_sk>),
+      Out(~session)
+    ]
+
+
+/*
+* ****************************************************************
+*   Order Processing  
+* ****************************************************************
+*/
+  rule UOpenAndOrderMA[role="U"]:
+    [
+      Fr(~goods),
+      U_State('init', ~session, <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password>)
+    ]
+    --[]->
+    [
+      U_State('ordered', ~session, <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password, ~goods>),
+      SOut('U-MA', ~session, $u_id, $ma_id, <'OpenAppAndOrder', ~goods>)
+    ]
+    
+  rule MAOrderMS[role="MA"]:
+    [
+      SIn('U-MA', ~session, $u_id, $ma_id, <'OpenAppAndOrder', ~goods>),
+      MA_State('init', ~session, <$ma_id, $u_id, $ms_id, $apa_id>)
+    ]
+    --[
+      SOURCE_OUT_FACT_BkChaCon('MA-MS', ~session, $ma_id, $ms_id, ~goods)
+    ]->
+    [
+      SOut('MA-MS', ~session, $ma_id, $ms_id, ~goods),
+      MA_State('ordered', ~session, <$ma_id, $u_id, $ms_id, $apa_id, ~goods>)
+    ]
+
+  rule MSProcessOrderMA[role="MS"]:
+    let 
+      subject = gen_desc(~goods)
+      total_amount = calc_amt(~goods)
+      biz_content = <~out_trade_no, total_amount, subject>
+      m_sig = sign(<~app_id, biz_content, $notify_url>, ~m_sk)
+      order_str = <~app_id, biz_content, $notify_url, m_sig>
+    in
+    [
+      SIn('MA-MS', ~session, $ma_id, $ms_id, ~goods),
+      MS_State('init', ~session, <$ms_id, $notify_url, $ma_id, $u_id, $apa_id, $aps_id, ~app_id, ~m_sk>),
+      Fr(~out_trade_no)
+    ]
+    --[
+      SOURCE_OUT_FACT_BkChaCon('MA-MS', ~session, $ms_id, $ma_id, order_str),
+      SOURCE_OUT_FACT_M_SIGN('MA-MS', ~session, $ms_id, $ma_id, order_str),
+      MS_Running('PSAuthMS', $ms_id, $aps_id, order_str),
+      MS_Running('UAuthMS', $ms_id, $u_id, ~out_trade_no),
+    ]->
+    [
+      SOut('MA-MS', ~session, $ms_id, $ma_id, order_str),
+      !MS_Database($ms_id, $u_id, biz_content, ~out_trade_no),
+      MS_State('OrderProcessed', ~session, <$ms_id, $notify_url, $ma_id, $u_id, $apa_id, $aps_id, ~app_id, ~m_sk>)
+    ]
+
+/*
+* ****************************************************************
+*   Payment Submission
+* ****************************************************************
+*/
+  rule MACallAPA[role="MA"]:
+    let 
+      biz_content = <~out_trade_no, total_amount, subject>
+      order_str = <~app_id, biz_content, $notify_url, m_sig>
+    in
+    [
+      SIn('MA-MS', ~session, $ms_id, $ma_id, order_str),
+      MA_State('ordered', ~session, <$ma_id, $u_id, $ms_id, $apa_id, ~goods>)
+    ]   
+    --[
+      SOURCE_OUT_FACT_BkChaCon('MA-APA', ~session, $ma_id, $apa_id, order_str),
+      SOURCE_IN_FACT_M_SIGN('MA-MS', ~session, $ms_id, $ma_id, order_str),
+      Finish('MA', ~session, $ma_id)
+    ]->
+    [
+      SOut('MA-APA', ~session, $ma_id, $apa_id, order_str),
+      MA_State('called', ~session, <$ma_id, $u_id, $ms_id, $apa_id, order_str>)
+    ]
+
+  rule APASendPaymentAPS[role="APA"]:
+    let
+      biz_content = <~out_trade_no, total_amount, subject>
+      order_str = <~app_id, biz_content, $notify_url, m_sig>
+    in
+    [
+      SIn('MA-APA', ~session, $ma_id, $apa_id, order_str),
+      APA_State('init', ~session, <$apa_id, $u_id, $ma_id, $ms_id, $aps_id>)
+    ]   
+    --[]->
+    [
+      SOut('APA-APS', ~session, $apa_id, $aps_id, order_str),
+      APA_State('paying', ~session, <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, order_str>)
+    ]
+
+  rule APSVerifyPaymentAPA[role="APS"]:
+    let
+      biz_content = <~out_trade_no, total_amount, subject>
+      order_str = <~app_id, biz_content, $notify_url, m_sig>
+      veri_result = verify(m_sig, <~app_id, biz_content, $notify_url>, m_pk)
+    in
+    [
+      SIn('APA-APS', ~session, $apa_id, $aps_id, order_str),
+      APS_State('init', ~session, <$aps_id, $apa_id, $ms_id, ~a_sk>),
+      !MerchantRegistered(<$ms_id, ~app_id, m_pk>)
+    ]   
+    --[
+      Eq(veri_result, true), // Verify merchant signature
+      PS_Commit('PSAuthMS', $aps_id, $ms_id, order_str)
+    ]->
+    [
+      SOut('APA-APS', ~session, $aps_id, $apa_id, <'SReqPwd', total_amount, subject>),
+      !APS_Database($aps_id, biz_content, ~out_trade_no),
+      APS_State('waitpwd', ~session, <$aps_id, $apa_id, $ms_id, ~a_sk, order_str>)
+    ]
+
+/*
+* ****************************************************************
+*   User Authentication & Authorization
+* ****************************************************************
+*/
+  rule APARequestUserPassword[role="APA"]:
+    let
+      biz_content = <~out_trade_no, total_amount, subject>
+      order_str = <~app_id, biz_content, $notify_url, m_sig>
+    in
+    [
+      SIn('APA-APS', ~session, $aps_id, $apa_id, <'SReqPwd', total_amount, subject>),
+      APA_State('paying', ~session, <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, order_str>)
+    ]   
+    --[]->
+    [
+      SOut('U-APA', ~session, $apa_id, $u_id, <'AReqPwd', total_amount, subject, ~out_trade_no>),
+      APA_State('waitpwd', ~session, <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, order_str>)
+    ]
+
+  rule USubmitPasswordAPA[role="U"]:
+    let
+      subject = gen_desc(~goods)
+      total_amount = calc_amt(~goods)
+    in
+    [
+      U_State('ordered', ~session, <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password, ~goods>),
+      SIn('U-APA', ~session, $apa_id, $u_id, <'AReqPwd', total_amount, subject, ~out_trade_no>)
+    ]   
+    --[
+      UserInputPwd($u_id, ~password, ~session),
+    ]->
+    [
+      SOut('U-APA', ~session, $u_id, $apa_id, ~password),
+      U_State('pwdsubmitted', ~session, <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password, ~goods, ~out_trade_no>)
+    ]
+
+  rule APASubmitPasswordAPS[role="APA"]:
+    [
+      SIn('U-APA', ~session, $u_id, $apa_id, ~password),
+      APA_State('waitpwd', ~session, <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, order_str>)
+    ]   
+    --[]->
+    [
+      SOut('APA-APS', ~session, $apa_id, $aps_id, h(~password)),
+      APA_State('pwdsubmitted', ~session, <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, order_str>)
+    ]
+
+  rule APSVerifyPasswordAndConfirmAPA[role="APS"]:
+    let
+      biz_content = <~out_trade_no, total_amount, subject>
+      order_str = <~app_id, biz_content, $notify_url, m_sig>
+      response = <~app_id, ~out_trade_no, ~trade_no, total_amount>
+      res_sign = sign(response, ~a_sk)
+    in
+    [
+      Fr(~trade_no),
+      SIn('APA-APS', ~session, $apa_id, $aps_id, pwd_hash),
+      APS_State('waitpwd', ~session, <$aps_id, $apa_id, $ms_id, ~a_sk, order_str>),
+      !UserRegistered(<$u_id, pwd_hash>)
+    ]   
+    --[
+      Finish('APS', ~session, $aps_id),
+      SOURCE_OUT_FACT_RES_SIGN(res_sign),
+      PS_Running('MSAuthPS', $aps_id, $ms_id, response),
+      PS_Running('UAuthPS',  $aps_id, $u_id, <total_amount, subject>),
+      PaymentComplete($u_id, pwd_hash, ~session)
+    ]->
+    [
+      SOut('MS-APS', ~session, $aps_id, $notify_url, <response, res_sign>),
+      SOut('APA-APS', ~session, $aps_id, $apa_id, <response, res_sign>),
+      APS_State('confirmed', ~session, <$aps_id, $apa_id, $ms_id, ~a_sk, order_str>)
+    ]
+
+
+/*
+* ****************************************************************
+*   Result Notification
+* ****************************************************************
+*/
+  rule MSReceiveNotification[role="MS"]:
+    let
+      biz_content = <~out_trade_no, total_amount, subject>
+      response = <~app_id, ~out_trade_no, ~trade_no, total_amount>
+      veri_result = verify(res_sign, response, a_pk)
+    in
+    [
+      !APS_PubKey(a_pk),
+      SIn('MS-APS', ~session, $aps_id, $notify_url, <response, res_sign>),
+      !MS_Database($ms_id, $uesr, biz_content, ~out_trade_no),
+      MS_State('OrderProcessed', ~session, <$ms_id, $notify_url, $ma_id, $u_id, $apa_id, $aps_id, ~app_id, ~m_sk>)
+    ]   
+    --[
+      Eq(veri_result, true), // Verify APS signature
+      Finish('MS', ~session, $ms_id),
+      SOURCE_IN_FACT_RES_SIGN(res_sign),
+      MS_Commit('MSAuthPS', $ms_id, $aps_id, response)
+    ]->
+    [
+      MS_State('completed', ~session, <$ms_id, $notify_url, $ma_id, $u_id, $apa_id, $aps_id, ~app_id, ~m_sk>)
+    ]
+    
+  rule APAReceiveConfirmationAndNotifyU[role="APA"]:
+    let
+      biz_content = <~out_trade_no, total_amount, subject>
+      order_str = <~app_id, biz_content, $notify_url, m_sig>
+      response = <~app_id, ~out_trade_no, ~trade_no, total_amount>
+      veri_result = verify(res_sign, response, a_pk)
+    in
+    [
+      !APS_PubKey(a_pk),
+      SIn('APA-APS', ~session, $aps_id, $apa_id, <response, res_sign>),
+      APA_State('pwdsubmitted', ~session, <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, order_str>)
+    ]   
+    --[
+      // Verify APS signature
+      Eq(veri_result, true),
+      Finish('APA', ~session, $apa_id),
+      SOURCE_IN_FACT_RES_SIGN(res_sign)
+    ]->
+    [
+      SOut('U-APA', ~session, $apa_id, $u_id, <'PaymentSuccessful', total_amount, subject>),
+      APA_State('confirmed', ~session, <$apa_id, $u_id, $ma_id, $ms_id, $aps_id, order_str>)
+    ]
+
+  rule UReceiveNotification[role="U"]:
+    let
+      subject = gen_desc(~goods)
+      total_amount = calc_amt(~goods)
+    in
+    [
+      U_State('pwdsubmitted', ~session, <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password, ~goods, ~out_trade_no>),
+      SIn('U-APA', ~session, $apa_id, $u_id, <'PaymentSuccessful', total_amount, subject>)
+    ]   
+    --[
+      Finish('U', ~session, $u_id),
+      U_Commit('UAuthPS', $u_id, $aps_id, <total_amount, subject>),
+      U_Commit('UAuthMS', $u_id, $ms_id, ~out_trade_no)
+    ]->
+    [
+      U_State('completed', ~session, <$u_id, $ma_id, $ms_id, $apa_id, $aps_id, ~password, ~goods>)
+    ] 
+
+/*
+* ****************************************************************
+*   Lemmas
+* ****************************************************************
+*/
+
+  // Source Lemma
+  lemma typing [sources, heuristic={typing}]:
+    "
+      (All m1 m2 m3 m4 m5 #i. SOURCE_IN_FACT_BkChaCon(m1, m2, m3, m4, m5)@#i ==> (Ex #j. SOURCE_OUT_FACT_BkChaCon(m1, m2, m3, m4, m5)@#j & j < i) )
+      & (All m1 m2 m3 m4 m5 #i. SOURCE_IN_FACT_M_SIGN(m1, m2, m3, m4, m5)@#i ==> (Ex #j. SOURCE_OUT_FACT_M_SIGN(m1, m2, m3, m4, m5)@#j & j < i) 
+                                                                                | (Ex #j. SOURCE_OUT_FACT_BkChaInt(m1, m2, m3, m4, m5)@#j & j < i) )
+      & (All m1 #i. SOURCE_IN_FACT_RES_SIGN(m1)@#i ==> (Ex #j. SOURCE_OUT_FACT_RES_SIGN(m1)@#j & j < i) )
+    "
+  
+  // General Lemmas
+  lemma executable [heuristic={default}]:
+    exists-trace
+    "
+      Ex session u_id ma_id ms_id apa_id aps_id #i #j #k #l #m #n. 
+        Start(session, u_id, ma_id, ms_id, apa_id, aps_id)@n
+        & Finish('U', session, u_id)@i 
+        & Finish('MA', session, ma_id)@j 
+        & Finish('MS', session, ms_id)@k
+        & Finish('APA', session, apa_id)@l
+        & Finish('APS', session, aps_id)@m
+    "
+
+  /* -------------------- L1 -------------------- */
+  lemma PS_MS_Order_Injective_Agreement [heuristic={default}]:
+    "
+    All ps ms o #i. PS_Commit('PSAuthMS', ps, ms, o)@i ==> (
+      Ex #j. MS_Running('PSAuthMS', ms, ps, o)@j & j < i &
+      not (Ex ps2 ms2 #i2. PS_Commit('PSAuthMS', ps2, ms2, o)@i2 & not(#i2 = #i))
+    )
+    "
+
+  lemma U_MS_Order_Injective_Agreement [heuristic={default}]:
+    "
+    All u ms o #i. U_Commit('UAuthMS', u, ms, o)@i ==> (
+      Ex #j. MS_Running('UAuthMS', ms, u, o)@j & j < i &
+      not (Ex u2 ms2 #i2. U_Commit('UAuthMS', u2, ms2, o)@i2 & not(#i2 = #i))
+    )
+    "
+
+  /* -------------------- L2 -------------------- */
+  lemma MS_PS_Response_Injective_Agreement [heuristic={default}]:
+    "
+    All ms ps o #i. MS_Commit('MSAuthPS', ms, ps, o)@i ==> (
+      Ex #j. PS_Running('MSAuthPS', ps, ms, o)@j & j < i &
+      not (Ex ms2 ps2 #i2. MS_Commit('MSAuthPS', ms2, ps2, o)@i2 & not(#i2 = #i))
+    )
+    "
+
+  lemma U_PS_Response_Injective_Agreement [heuristic={default}]:
+    "
+    All u pa r #i. U_Commit('UAuthPS', u, pa, r)@i ==> (
+      Ex #j. PS_Running('UAuthPS', pa, u, r)@j & j < i &
+      not (Ex u2 pa2 #i2. U_Commit('UAuthPS', u2, pa2, r)@i2 & not(#i2 = #i))
+    )
+    "
+
+  /* -------------------- L3 -------------------- */ 
+  lemma No_Payment_Without_Password_Input [heuristic={default}]:
+    "
+    All u p s #i. PaymentComplete(u, h(p), s)@i ==> (
+      Ex #j. UserInputPwd(u, p, s)@j & j < i &
+      not (Ex u2 p2 #i2. PaymentComplete(u2, h(p2), s)@i2 & not(#i2 = #i))
+    )
+    "
+
+end

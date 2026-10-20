@@ -1,0 +1,557 @@
+theory PSP_B_pay_H5_Model
+begin
+
+heuristic: S
+builtins: signing, hashing, symmetric-encryption
+functions: gen_desc/1, calc_amt/1
+
+/*
+* ****************************************************************
+* Role: 
+*   - U (User) 
+*   - MW (Merchant Mobile Web)
+*   - MS (Merchant Server)
+*   - BPS (PSP-B Payment System)
+* Secure Communication Channels:
+*   1. U <------> MW, ch_id: "U-MW"
+*   2. U <-----> BPS, ch_id: "U-BPS"
+*   3. MS <----> BPS, ch_id: "MS-BPS"
+* Insecure Communication Channels:
+*   1. MW <----> MS, ch_id: "MW-MS"
+*   2. MW <---> BPS, ch_id: "MW-BPS"
+* Colors:
+*   - U: #c5f3c3
+*   - MW: #f3c3c7
+*   - MS: #f3ccc3
+*   - BPS: #c4c3f3
+*   - Secure Channel: #f0f5e5
+*   - Break Integrity: #f25a47
+*   - Break Confidentiality: #fccb16
+*   - Initialization: #d0deaa
+* ****************************************************************
+*/
+
+/*
+* ****************************************************************
+*   Tactics           
+* ****************************************************************
+*/
+  tactic: default
+    presort: S
+    prio:
+      regex ".*Commit.*"
+    prio:
+      regex ".*!KU\(.*m_sk.*"
+    prio:
+      regex ".*m_sk.*"
+    prio:
+      regex ".*_State.*"
+    prio:
+      regex ".*sign.*"
+    prio:
+      regex ".*BPS_PubKey.*"
+    prio:
+      regex ".*SOut\(.*U-.*"
+    prio:
+      regex ".*SOut\(.*-BPS.*"
+    prio:
+      regex ".*SIn\(.*U-.*"
+    prio:
+    regex ".*SIn\(.*-BPS.*"
+
+  tactic: typing
+    presort: S
+    prio:
+      regex ".*!KU\(\s*sign.*"
+    prio:
+      regex ".*SOURCE_.*"
+    prio:
+      regex ".*BPS_PublicKey.*"
+    prio:
+      regex ".*SOut\(.*U-.*"
+    prio:
+      regex ".*SOut\(.*-BPS.*"
+    prio:
+      regex ".*SIn\(.*U-.*"
+    prio:
+      regex ".*SIn\(.*-BPS.*"
+    prio:
+      regex ".*_State.*"
+    deprio:
+      regex ".*SOut*"
+    deprio:
+      regex ".*SIn*"
+
+/*
+* ****************************************************************
+*   Restrictions           
+* ****************************************************************
+*/
+  restriction OnlyOnceV:
+    "
+    All x #i #j. OnlyOnceV(x)@i & OnlyOnceV(x)@j ==> #i = #j
+    "
+  restriction Equality:
+    "All x y #i. Eq(x,y)@i ==> x = y" 
+
+  restriction Inequality:
+    "All x #i. Neq(x,x)@i ==> F"
+
+  restriction InsecureChannel:
+    "
+    All ch_id #i. InsecureChannel(ch_id)@i ==>
+      (ch_id = 'MW-BPS' | ch_id = 'MW-MS')
+    "
+
+/*
+* ****************************************************************
+*   Secure Communication Channels
+* ****************************************************************
+*/
+  rule SecureChannelSendRecv[color=f0f5e5]:
+    [
+      SOut(ch_id, ~session, $src, $dst, msg)
+    ]
+    --[
+      Neq($src, $dst)
+    ]->
+    [
+      SIn(ch_id, ~session, $src, $dst, msg)
+    ]
+
+  rule breakChannelConfidentiality[color=fccb16]:
+    [
+      SOut(ch_id, ~session, $src, $dst, msg)
+    ]
+    --[
+      OnlyOnceV(<$src, $dst, msg>),
+      BreakChannelCon(ch_id),
+      InsecureChannel(ch_id),
+      SOURCE_IN_FACT_BkChaCon(ch_id, ~session, $src, $dst, msg)
+    ]->
+    [
+      SOut(ch_id, ~session, $src, $dst, msg),
+      Out(<$src, $dst, msg>)
+    ]
+
+  rule breakChannelIntegrity[color=f25a47]:
+    [
+      In(<ch_id, ~session, $src, $dst, msg>)
+    ]
+    --[
+      BreakChannelInt(ch_id),
+      InsecureChannel(ch_id),
+      SOURCE_OUT_FACT_BkChaInt(ch_id, ~session, $src, $dst, msg)
+    ]->
+    [
+      SIn(ch_id, ~session, $src, $dst, msg)
+    ]
+/*
+* ****************************************************************
+*   Oracle
+* ****************************************************************
+*/
+  rule OrderCreateOracle[color=f9d27d]:
+    [
+      Fr(~h5_url),
+      Fr(~out_trade_no),
+      In(<amount, description>),
+      !MerchantCreated(<$ms_id, ~app_id, ~mch_id, $notify_url, ~m_sk>)
+    ]
+    --[]->
+    [
+      Out(~h5_url),
+      !MS_Database($ms_id, $attacker, ~h5_url, amount, description, ~out_trade_no),
+      !BPS_Database($bps_id, ~h5_url, amount, description, ~out_trade_no)
+    ]
+
+  rule PaymentQueryOracle[color=f9d27d]:
+    [
+      In(~h5_url),
+      !BPS_Database($bps_id, ~h5_url, amount, description, ~out_trade_no)
+    ]
+    --[]->
+    [
+      Out(<amount, description>)
+    ]
+
+/*
+* ****************************************************************
+*   Initialization
+* ****************************************************************
+*/
+  rule CreateBPS[color=c4c3f3]:
+    [
+      Fr(~w_sk),
+      Fr(~key_APIv3)
+    ]
+    --[ 
+      OnlyOnceV('BPS') // Only one instance of BPS
+    ]->
+    [
+      !BPS_PriKey(~w_sk),
+      !BPS_PubKey(pk(~w_sk)),
+      !BPS_APIv3Key(~key_APIv3)
+    ]
+
+  rule CreateMW[color=f3c3c7]:
+    []
+    --[ OnlyOnceV(<'MW', $mw_id>) ]->
+    [
+      MW_State('created', 'null', <$mw_id>)
+    ]
+
+  rule CreateU[color=c5f3c3]:
+    [   
+      Fr(~password)
+    ]
+    --[ OnlyOnceV(<'U', $u_id>) ]->
+    [
+      !UserRegistered(<$u_id, h(~password)>),
+      !UserPassword(<$u_id, ~password>)
+    ]
+
+  rule CreateMS[color=f3ccc3]:
+    [   
+      Fr(~app_id),
+      Fr(~mch_id),
+      Fr(~m_sk)
+    ]
+    --[
+      OnlyOnceV(<'MS', $ms_id>)
+    ]->
+    [
+      !MerchantCreated(<$ms_id, ~app_id, ~mch_id, $notify_url, ~m_sk>),
+      !MerchantRegistered(<$ms_id, ~app_id, ~mch_id, pk(~m_sk)>)
+    ]
+
+  rule NewPaymentSession[color=d0deaa]:
+    [
+      Fr(~session),
+      !BPS_PriKey(~w_sk),
+      !UserPassword(<$u_id, ~password>),
+      !MerchantCreated(<$ms_id, ~app_id, ~mch_id, $notify_url, ~m_sk>),
+      MW_State('created', 'null', <$mw_id>),
+    ]
+    --[
+      Start(~session, $u_id, $mw_id, $ms_id, $bps_id)
+    ]->
+    [
+      U_State('init', ~session, <$u_id, $ms_id, $mw_id, $bps_id, ~password>),
+      MW_State('init', ~session, <$mw_id, $u_id, $ms_id, $bps_id>),
+      MS_State('init', ~session, <$ms_id, $mw_id, $bps_id, $u_id, $notify_url, ~app_id, ~mch_id, ~m_sk>),
+      BPS_State('init', ~session, <$bps_id, $u_id, $mw_id, $ms_id, ~w_sk>),
+      Out(~session)
+    ]
+
+
+/*
+* ****************************************************************
+*   Order Processing  
+* ****************************************************************
+*/
+  rule UOpenAndOrderMW[role="U"]:
+    [
+      Fr(~goods),
+      U_State('init', ~session, <$u_id, $ms_id, $mw_id, $bps_id, ~password>)
+    ]
+    --[]->
+    [
+      U_State('ordered', ~session, <$u_id, $ms_id, $mw_id, $bps_id, ~password, ~goods>),
+      SOut('U-MW', ~session, $u_id, $mw_id, <'OpenAppAndOrder', ~goods>)
+    ]
+
+  rule MWOrderMS[role="MW"]:
+    [
+      SIn('U-MW', ~session, $u_id, $mw_id, <'OpenAppAndOrder', ~goods>),
+      MW_State('init', ~session, <$mw_id, $u_id, $ms_id, $bps_id>)
+    ]
+    --[
+      SOURCE_OUT_FACT_BkChaCon('MW-MS', ~session, $mw_id, $ms_id, ~goods)   
+    ]->
+    [
+      SOut('MW-MS', ~session, $mw_id, $ms_id, ~goods),
+      MW_State('ordered', ~session, <$mw_id, $u_id, $ms_id, $bps_id>)
+    ]
+
+  rule MSProcessOrderBPS[role="MS"]:
+    let
+      description = gen_desc(~goods)
+      amount = calc_amt(~goods)
+      body = <~app_id, ~mch_id, description, ~out_trade_no, $notify_url, amount>
+      m_sig = sign(<~nonce, body>, ~m_sk)
+      authorization = <~mch_id, ~nonce, m_sig>
+      Out_m = <authorization, body>
+    in
+    [
+      SIn('MW-MS', ~session, $mw_id, $ms_id, ~goods),
+      MS_State('init', ~session, <$ms_id, $mw_id, $bps_id, $u_id, $notify_url, ~app_id, ~mch_id, ~m_sk>),
+      Fr(~out_trade_no),
+      Fr(~nonce)
+    ]
+    --[
+      SOURCE_OUT_FACT_BkChaCon('MS-BPS', ~session, $ms_id, $bps_id, Out_m),
+      SOURCE_OUT_FACT_M_SIGN('MS-BPS', ~session, $ms_id, $bps_id, Out_m),
+      MS_Running('PSAuthMS', $ms_id, $bps_id, body)
+    ]->
+    [
+      SOut('MS-BPS', ~session, $ms_id, $bps_id, Out_m),
+      MS_State('OrderProcessed', ~session, <$ms_id, $mw_id, $bps_id, $u_id, $notify_url, ~app_id, ~mch_id, ~m_sk, ~out_trade_no, ~goods>)
+    ]
+
+/*
+* ****************************************************************
+*   Payment Submission
+* ****************************************************************
+*/
+  rule BPSSendH5urlMS[role="BPS"]:
+    let
+      body = <~app_id, ~mch_id, description, ~out_trade_no, $notify_url, amount>
+      authorization = <~mch_id, ~nonce, m_sig>
+      In_m = <authorization, body>
+      veri_result = verify(m_sig, <~nonce, body>, m_pk) 
+    in
+    [
+      SIn('MS-BPS', ~session, $ms_id, $bps_id, In_m),
+      BPS_State('init', ~session, <$bps_id, $u_id, $ma_id, $ms_id, ~w_sk>),
+      !MerchantRegistered(<$ms_id, ~app_id, ~mch_id, m_pk>),
+      Fr(~h5_url)
+    ]
+    --[
+      Eq(veri_result, true), // Verify merchant signature
+      PS_Commit('PSAuthMS', $bps_id, $ms_id, body),
+      SOURCE_IN_FACT_M_SIGN('MS-BPS', ~session, $ms_id, $bps_id, In_m),
+    ]->
+    [
+      SOut('MS-BPS', ~session, $bps_id, $ms_id, ~h5_url),
+      !BPS_Database($bps_id, ~h5_url, amount, description, ~out_trade_no),
+      BPS_State('sendh5url', ~session, <$bps_id, $u_id, $ma_id, $ms_id, ~w_sk>)
+    ]
+  
+  rule MSSendH5urlMW[role="MS"]:
+    let
+      amount = calc_amt(~goods)
+      description = gen_desc(~goods)
+    in
+    [
+      SIn('MS-BPS', ~session, $bps_id, $ms_id, ~h5_url),
+      MS_State('OrderProcessed', ~session, <$ms_id, $mw_id, $bps_id, $u_id, $notify_url, ~app_id, ~mch_id, ~m_sk, ~out_trade_no, ~goods>)
+    ]
+    --[
+      SOURCE_OUT_FACT_BkChaCon('MW-MS', ~session, $ms_id, $mw_id, ~h5_url),
+      MS_Running('UAuthMS', $ms_id, $u_id, ~h5_url)
+    ]->
+    [
+      SOut('MW-MS', ~session, $ms_id, $mw_id, ~h5_url),
+      !MS_Database($ms_id, $u_id, ~h5_url, amount, description, ~out_trade_no),
+      MS_State('sendh5url', ~session, <$ms_id, $mw_id, $bps_id, $u_id, $notify_url, ~app_id, ~mch_id, ~m_sk, ~out_trade_no>)
+    ]
+
+  rule MWCallBPS[role="MW"]:
+    [
+      SIn('MW-MS', ~session, $ms_id, $mw_id, ~h5_url),
+      MW_State('ordered', ~session, <$mw_id, $u_id, $ms_id, $bps_id>)
+    ]
+    --[
+      Finish('MW', ~session, $mw_id),
+      SOURCE_OUT_FACT_BkChaCon('MW-BPS', ~session, $mw_id, $bps_id, ~h5_url),
+    ]->
+    [
+      SOut('MW-BPS', ~session, $mw_id, $bps_id, ~h5_url),
+      MW_State('called', ~session, <$mw_id, $u_id, $ms_id, $bps_id>)
+    ]
+
+  rule BPSVerifyPaymentMW[role="BPS"]:
+    [
+      SIn('MW-BPS', ~session, $mw_id, $bps_id, ~h5_url),
+      !BPS_Database($bps_id, ~h5_url, amount, description, ~out_trade_no),
+      BPS_State('sendh5url', ~session, <$bps_id, $u_id, $ma_id, $ms_id, ~w_sk>)
+    ]
+    --[]->
+    [
+      SOut('U-BPS', ~session, $bps_id, $u_id, <'SReqPwd', amount, description, ~h5_url>),
+      BPS_State('waitpwd', ~session, <$bps_id, $u_id, $ma_id, $ms_id, ~w_sk, ~h5_url, ~out_trade_no, amount, description>)
+    ]
+
+/*
+* ****************************************************************
+*   User Authentication & Authorization
+* ****************************************************************
+*/
+  rule USubmitPasswordBPS[role="U"]:
+    let
+      amount = calc_amt(~goods)
+      description = gen_desc(~goods)
+    in
+    [
+      U_State('ordered', ~session, <$u_id, $ms_id, $mw_id, $bps_id, ~password, ~goods>),
+      SIn('U-BPS', ~session, $bps_id, $u_id, <'SReqPwd', amount, description, ~h5_url>),
+      !UserRegistered(<$u_id, h(~password)>),
+    ]
+    --[
+      UserInputPwd($u_id, ~password, ~session),
+    ]->
+    [
+      SOut('U-BPS', ~session, $u_id, $bps_id, ~password),
+      U_State('pwdsubmitted', ~session, <$u_id, $ms_id, $mw_id, $bps_id, ~password, ~goods, ~h5_url>)
+    ]
+  
+  rule BPSVerifyPasswordAndConfirmUMS[role="BPS"]:
+    let
+      m = <~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, ~nonce_enc>
+      m_enc = senc(m, ~key_APIv3)
+      response = <~id, m_enc, ~nonce_enc, ~summary>
+      res_sign = sign(<response, ~nonce_sig>, ~w_sk)
+      Out_m = <response, res_sign, ~nonce_sig>
+    in
+    [
+      SIn('U-BPS', ~session, $u_id, $bps_id, ~password),
+      BPS_State('waitpwd', ~session, <$bps_id, $u_id, $ma_id, $ms_id, ~w_sk, ~h5_url, ~out_trade_no, amount, description>),
+      !UserRegistered(<$u_id, h(~password)>),
+      !MerchantRegistered(<$ms_id, ~app_id, ~mch_id, m_pk>),
+      !BPS_APIv3Key(~key_APIv3),
+      Fr(~transaction_id),
+      Fr(~nonce_enc),
+      Fr(~summary),
+      Fr(~id),
+      Fr(~nonce_sig)
+    ]
+    --[
+      PS_Running('MSAuthPS', $bps_id, $ms_id, response),
+      PS_Running('UAuthPS',  $bps_id, $u_id, <amount, description>),
+      PaymentComplete($u_id, h(~password), ~session)
+    ]->
+    [
+      SOut('U-BPS', ~session, $bps_id, $u_id, <'PaymentSuccessful', amount, description>),
+      SOut('MS-BPS', ~session, $bps_id, $notify_url, Out_m),
+      BPS_State('paysuccess', ~session, <$bps_id, $u_id, $mw_id, $ms_id, ~w_sk>)
+    ]
+  
+/*
+* ****************************************************************
+*   Result Notification
+* ****************************************************************
+*/
+  rule UReceiveNotification[role="U"]:
+    let
+      amount = calc_amt(~goods)
+      description = gen_desc(~goods)
+    in
+    [
+      SIn('U-BPS', ~session, $bps_id, $u_id, <'PaymentSuccessful', amount, description>),
+      U_State('pwdsubmitted', ~session, <$u_id, $ms_id, $mw_id, $bps_id, ~password, ~goods, ~h5_url>)
+    ]   
+    --[
+      Finish('U', ~session, $u_id),
+      U_Commit('UAuthPS', $u_id, $bps_id, <amount, description>),
+      U_Commit('UAuthMS', $u_id, $ms_id, ~h5_url)
+    ]->
+    [
+      U_State('completed', ~session, <$u_id, $ms_id, $mw_id, $bps_id, ~password, ~goods>)
+    ] 
+  
+  rule MSReceiveNotification[role="MS"]:
+    let
+      m = <~app_id, ~mch_id, ~out_trade_no, ~transaction_id, amount, ~nonce_enc>
+      m_enc = senc(m, ~key_APIv3)
+      response = <~id, m_enc, ~nonce_enc, ~summary>
+      In_m = <response, res_sign, ~nonce_sig>
+      veri_result = verify(res_sign, <response, ~nonce_sig>, w_pk)
+    in
+    [
+      MS_State('sendh5url', ~session, <$ms_id, $mw_id, $bps_id, $u_id, $notify_url, ~app_id, ~mch_id, ~m_sk, ~out_trade_no>),
+      !MS_Database($ms_id, $user, ~h5_url, amount, description, ~out_trade_no),
+      SIn('MS-BPS', ~session, $bps_id, $notify_url, In_m),
+      !BPS_APIv3Key(~key_APIv3),
+      !BPS_PubKey(w_pk)
+    ]
+    --[
+      Eq(veri_result, true), // Verify BPS signature
+      Finish('MS', ~session, $ms_id),
+      MS_Commit('MSAuthPS', $ms_id, $bps_id, response)
+    ]->
+    [
+      SOut('MS-BPS', ~session, $notify_url, $bps_id, 'Successful'),
+      MS_State('completed', ~session, <$ms_id, $mw_id, $notify_url, $bps_id, ~app_id, ~mch_id, ~m_sk>)
+    ]
+  
+  rule BPSReceiveSuccess[role="BPS"]:
+    [
+      BPS_State('paysuccess', ~session, <$bps_id, $u_id, $mw_id, $ms_id, ~w_sk>),
+      SIn('MS-BPS', ~session, $notify_url, $bps_id, 'Successful')
+    ]
+    --[Finish('BPS', ~session, $bps_id)]->
+    [
+      BPS_State('completed', ~session, <$bps_id, $u_id, $mw_id, $ms_id, ~w_sk>)
+    ]
+
+/*
+* ****************************************************************
+*   Lemmas
+* ****************************************************************
+*/
+
+  // Source Lemma
+  lemma typing [sources, heuristic={typing}]:
+    "
+      (All m1 m2 m3 m4 m5 #i. SOURCE_IN_FACT_BkChaCon(m1, m2, m3, m4, m5)@#i ==> (Ex #j. SOURCE_OUT_FACT_BkChaCon(m1, m2, m3, m4, m5)@#j & j < i) )
+      & (All m1 m2 m3 m4 m5 #i. SOURCE_IN_FACT_M_SIGN(m1, m2, m3, m4, m5)@#i ==> (Ex #j. SOURCE_OUT_FACT_M_SIGN(m1, m2, m3, m4, m5)@#j & j < i) 
+                                                                                | (Ex #j. SOURCE_OUT_FACT_BkChaInt(m1, m2, m3, m4, m5)@#j & j < i) )
+    "
+
+  // General Lemmas
+  lemma executable [heuristic={default}]:
+    exists-trace
+    "
+      Ex session u_id mw_id ms_id bps_id  #i #j #k #l #m. 
+        Start(session, u_id, mw_id, ms_id, bps_id)@m
+        & Finish('U', session, u_id)@i 
+        & Finish('MW', session, mw_id)@j 
+        & Finish('MS', session, ms_id)@k
+        & Finish('BPS', session, bps_id)@l
+    "
+    
+  /* -------------------- L1 -------------------- */
+  lemma PS_MS_Order_Injective_Agreement [heuristic={default}]:
+    "
+    All ps ms o #i. PS_Commit('PSAuthMS', ps, ms, o)@i ==> (
+      Ex #j. MS_Running('PSAuthMS', ms, ps, o)@j & j < i &
+      not (Ex ps2 ms2 #i2. PS_Commit('PSAuthMS', ps2, ms2, o)@i2 & not(#i2 = #i))
+    )
+    "
+
+  lemma U_MS_Order_Injective_Agreement [heuristic={default}]:
+    "
+    All u ms o #i. U_Commit('UAuthMS', u, ms, o)@i ==> (
+      Ex #j. MS_Running('UAuthMS', ms, u, o)@j & j < i &
+      not (Ex u2 ms2 #i2. U_Commit('UAuthMS', u2, ms2, o)@i2 & not(#i2 = #i))
+    )
+    "
+
+  /* -------------------- L2 -------------------- */
+  lemma MS_PS_Response_Injective_Agreement [heuristic={default}]:
+    "
+    All ms ps o #i. MS_Commit('MSAuthPS', ms, ps, o)@i ==> (
+      Ex #j. PS_Running('MSAuthPS', ps, ms, o)@j & j < i &
+      not (Ex ms2 ps2 #i2. MS_Commit('MSAuthPS', ms2, ps2, o)@i2 & not(#i2 = #i))
+    )
+    "
+
+  lemma U_PS_Response_Injective_Agreement [heuristic={default}]:
+    "
+    All u pa r #i. U_Commit('UAuthPS', u, pa, r)@i ==> (
+      Ex #j. PS_Running('UAuthPS', pa, u, r)@j & j < i &
+      not (Ex u2 pa2 #i2. U_Commit('UAuthPS', u2, pa2, r)@i2 & not(#i2 = #i))
+    )
+    "
+
+  /* -------------------- L3 -------------------- */ 
+  lemma No_Payment_Without_Password_Input [heuristic={default}]:
+    "
+    All u p s #i. PaymentComplete(u, h(p), s)@i ==> (
+      Ex #j. UserInputPwd(u, p, s)@j & j < i &
+      not (Ex u2 p2 #i2. PaymentComplete(u2, h(p2), s)@i2 & not(#i2 = #i))
+    )
+    "
+
+end

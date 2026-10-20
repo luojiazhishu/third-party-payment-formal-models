@@ -1,0 +1,567 @@
+theory Pay_Repair_Model_SCC_Order
+begin
+
+heuristic: S
+builtins: signing, hashing, asymmetric-encryption
+functions: gen_desc/1, calc_amt/1, f/1
+
+/*
+* ****************************************************************
+* SCC (Sealed Checkout Code) countermeasure.
+* Built directly on countermeasures/regular_order.spthy:
+*   - removed: per-user key pair (ua_sk / ua_pk) and u_sig
+*   - added:   MF-generated nonce r,
+*              seal = aenc(<h(<ms_id, prepay_id, u_id>), r>, pk_PS),
+*              code = f(r) shown by MF and typed by the user,
+*              PS checks the seal against its order record and
+*              checks the typed code.
+* Channels, query oracle, tactics and lemmas are kept as in regular_order;
+* the order oracle records the attacker account in the PS order (u_id is
+* part of the signed order) and may not use the honest user account.
+*
+* Role:
+*   - U (User), MF (Merchant Frontend), MS (Merchant Server), PS (Payment System)
+* Secure Communication Channels:
+*   1. U <------> MF, ch_id: "U-MF"
+*   2. U <-----> PS, ch_id: "U-PS"
+*   3. MS <----> PS, ch_id: "MS-PS"
+* Insecure Communication Channels:
+*   1. MF <----> MS, ch_id: "MF-MS"
+*   2. MF <---> PS, ch_id: "MF-PS"
+* ****************************************************************
+*/
+
+/*
+* ****************************************************************
+*   Tactics
+* ****************************************************************
+*/
+  tactic: default
+    presort: S
+    prio:
+      regex ".*Commit.*"
+    prio:
+      regex ".*_State.*"
+    prio:
+      regex ".*!KU\(.*_sk.*"
+    prio:
+      regex ".*_sk.*"
+    prio:
+      regex ".*sign.*"
+    prio:
+      regex ".*PS_PubKey.*"
+    prio:
+      regex ".*SOut\(.*U-.*"
+    prio:
+      regex ".*SOut\(.*-PS.*"
+    prio:
+      regex ".*SIn\(.*U-.*"
+    prio:
+      regex ".*SIn\(.*-PS.*"
+
+  tactic: typing
+    presort: S
+    prio:
+      regex ".*!KU\(\s*sign.*"
+    prio:
+      regex ".*SOURCE_.*"
+    prio:
+      regex ".*PS_PubKey.*"
+    prio:
+      regex ".*SOut\(.*U-.*"
+    prio:
+      regex ".*SOut\(.*-PS.*"
+    prio:
+      regex ".*SIn\(.*U-.*"
+    prio:
+      regex ".*SIn\(.*-PS.*"
+    prio:
+      regex ".*_State.*"
+    deprio:
+      regex ".*SOut*"
+    deprio:
+      regex ".*SIn*"
+
+/*
+* ****************************************************************
+*   Restrictions
+* ****************************************************************
+*/
+  restriction OnlyOnceV:
+    "
+    All x #i #j. OnlyOnceV(x)@#i & OnlyOnceV(x)@#j ==> #i = #j
+    "
+  restriction Equality:
+    "All x y #i. Eq(x,y) @#i ==> x = y"
+
+  restriction Inequality:
+    "All x #i. Neq(x,x) @i ==> F"
+
+  restriction InsecureChannel:
+    "
+    All ch_id #i. InsecureChannel(ch_id) @#i ==>
+      (ch_id = 'MF-MS' | ch_id = 'MF-PS')
+    "
+
+  // The order oracle places orders on accounts the attacker controls,
+  // which are never the account of the honest user.
+  restriction AttackerAccountNotHonest:
+    "All a #i #j. HonestUser(a)@#i & AttackerAccount(a)@#j ==> F"
+
+/*
+* ****************************************************************
+*   Secure Communication Channels
+* ****************************************************************
+*/
+  rule SecureChannelSendRecv[color=f0f5e5]:
+    [
+      SOut(ch_id, ~session, $src, $dst, msg)
+    ]
+    --[
+      Neq($src, $dst)
+    ]->
+    [
+      SIn(ch_id, ~session, $src, $dst, msg)
+    ]
+
+  rule breakChannelConfidentiality[color=fccb16]:
+    [
+      SOut(ch_id, ~session, $src, $dst, msg)
+    ]
+    --[
+      OnlyOnceV(<$src, $dst, msg>),
+      BreakChannelCon(ch_id),
+      InsecureChannel(ch_id),
+      SOURCE_IN_FACT_BkChaCon(ch_id, ~session, $src, $dst, msg)
+    ]->
+    [
+      SOut(ch_id, ~session, $src, $dst, msg),
+      Out(<$src, $dst, msg>)
+    ]
+
+  rule breakChannelIntegrity[color=f25a47]:
+    [
+      In(<ch_id, ~session, $src, $dst, msg>)
+    ]
+    --[
+      BreakChannelInt(ch_id),
+      InsecureChannel(ch_id),
+      SOURCE_OUT_FACT_BkChaInt(ch_id, ~session, $src, $dst, msg)
+    ]->
+    [
+      SIn(ch_id, ~session, $src, $dst, msg)
+    ]
+
+/*
+* ****************************************************************
+*   Oracle
+*   As in regular_order: the attacker orders on its OWN account with
+*   arbitrary amount and description. The order is ledger-faithful:
+*   the order is recorded under the attacker account $attacker, both in
+*   the merchant ledger and in the signed order held by PS.
+* ****************************************************************
+*/
+  rule OrderCreateOracle[color=f9d27d]:
+    let
+      m_sig = sign(<~prepay_id, $ms_id>, ~m_sk)
+      Out_m = <~prepay_id, $ms_id, m_sig>
+    in
+    [
+      Fr(~prepay_id),
+      Fr(~order_id),
+      In(<amount, description>),
+      !MerchantCreated(<$ms_id, ~m_sk>),
+    ]
+    --[ AttackerAccount($attacker) ]->
+    [
+      Out(Out_m),
+      !MS_Database($ms_id, $attacker, ~prepay_id, amount, description, ~order_id),
+      !PS_Database($ps_id, ~prepay_id, amount, description, ~order_id, $attacker)
+    ]
+
+  rule PaymentQueryOracle[color=f9d27d]:
+    [
+      In(~prepay_id),
+      !PS_Database($ps_id, ~prepay_id, amount, description, ~order_id, uid)
+    ]
+    --[]->
+    [
+      Out(<amount, description>)
+    ]
+
+/*
+* ****************************************************************
+*   Initialization
+* ****************************************************************
+*/
+  rule CreatePS[color=d3c3f3]:
+    [
+      Fr(~p_sk)
+    ]
+    --[
+      OnlyOnceV('PS') // Only one instance of PS
+    ]->
+    [
+      !PS_PriKey(~p_sk),
+      !PS_PubKey(pk(~p_sk))
+    ]
+
+  rule CreateMF[color=f3c3c7]:
+    []
+    --[ OnlyOnceV(<'MF', $mf_id>) ]->
+    [
+      MF_State('created', 'null', <$mf_id>)
+    ]
+
+  rule CreateU[color=c5f3c3]:
+    [
+      Fr(~password)
+    ]
+    --[ OnlyOnceV(<'U'>), HonestUser($u_id) ]->
+    [
+      !UserRegistered(<$u_id, h(~password)>),
+      !UserPassword(<$u_id, ~password>)
+    ]
+
+  rule CreateMS[color=f3ccc3]:
+    [
+      Fr(~m_sk)
+    ]
+    --[
+      OnlyOnceV(<'MS', $ms_id>)
+    ]->
+    [
+      !MerchantRegistered(<$ms_id, pk(~m_sk)>),
+      !MerchantCreated(<$ms_id, ~m_sk>)
+    ]
+
+  rule NewPaymentSession[color=d0deaa]:
+    [
+      Fr(~session),
+      !PS_PriKey(~p_sk),
+      !UserPassword(<$u_id, ~password>),
+      !MerchantCreated(<$ms_id, ~m_sk>),
+      MF_State('created', 'null', <$mf_id>)
+    ]
+    --[
+      Start(~session, $u_id, $mf_id, $ms_id, $ps_id)
+    ]->
+    [
+      U_State('init', ~session, <$u_id, $mf_id, $ms_id, $ps_id, ~password>),
+      MF_State('init', ~session, <$mf_id, $u_id, $ms_id, $ps_id>),
+      MS_State('init', ~session, <$ms_id, $mf_id, $ps_id, $u_id, ~m_sk>),
+      PS_State('init', ~session, <$ps_id, $u_id, $mf_id, $ms_id, ~p_sk>),
+      Out(~session)
+    ]
+
+/*
+* ****************************************************************
+*   Order Processing
+*   SCC: MS includes the user account u_id in the order it signs for PS.
+* ****************************************************************
+*/
+  rule UOpenAndOrderMF[role="U"]:
+    [
+      Fr(~goods),
+      U_State('init', ~session, <$u_id, $mf_id, $ms_id, $ps_id, ~password>)
+    ]
+    --[]->
+    [
+      U_State('ordered', ~session, <$u_id, $mf_id, $ms_id, $ps_id, ~password, ~goods>),
+      SOut('U-MF', ~session, $u_id, $mf_id, <'OpenAppAndOrder', ~goods>)
+    ]
+
+  rule MFOrderMS[role="MF"]:
+    [
+      SIn('U-MF', ~session, $u_id, $mf_id, <'OpenAppAndOrder', ~goods>),
+      MF_State('init', ~session, <$mf_id, $u_id, $ms_id, $ps_id>)
+    ]
+    --[
+      SOURCE_OUT_FACT_BkChaCon('MF-MS', ~session, $mf_id, $ms_id, <$u_id, ~goods>)
+    ]->
+    [
+      SOut('MF-MS', ~session, $mf_id, $ms_id, <$u_id, ~goods>),
+      MF_State('ordered', ~session, <$mf_id, $u_id, $ms_id, $ps_id>)
+    ]
+
+  rule MSProcessOrderMF[role="MS"]:
+    let
+      description = gen_desc(~goods)
+      amount = calc_amt(~goods)
+      m_sig = sign(<$ms_id, ~order_id, amount, description, $u_id>, ~m_sk)
+      Out_m = <$ms_id, ~order_id, amount, description, $u_id, m_sig>
+    in
+    [
+      SIn('MF-MS', ~session, $mf_id, $ms_id, <$u_id, ~goods>),
+      MS_State('init', ~session, <$ms_id, $mf_id, $ps_id, $u_id, ~m_sk>),
+      Fr(~order_id)
+    ]
+    --[
+      SOURCE_OUT_FACT_BkChaCon('MS-PS', ~session, $ms_id, $ps_id, Out_m),
+      SOURCE_OUT_FACT_M_SIGN_2('MS-PS', ~session, $ms_id, $ps_id, Out_m),
+      MS_Running('PSAuthMS', $ms_id, $ps_id, <~order_id, amount, description>),
+      MS_Running('UAuthMS', $ms_id, $u_id, ~goods)
+    ]->
+    [
+      SOut('MS-PS', ~session, $ms_id, $ps_id, Out_m),
+      MS_State('Sendupk', ~session, <$ms_id, $mf_id, $ps_id, $u_id, ~m_sk, ~order_id, ~goods>)
+    ]
+
+/*
+* ****************************************************************
+*   Payment Submission
+* ****************************************************************
+*/
+  rule PSReceiveOrderMS[role="PS"]:
+    let
+      In_m = <$ms_id, ~order_id, amount, description, uid, m_sig>
+      veri_result = verify(m_sig, <$ms_id, ~order_id, amount, description, uid>, m_pk)
+    in
+    [
+      SIn('MS-PS', ~session, $ms_id, $ps_id, In_m),
+      PS_State('init', ~session, <$ps_id, $u_id, $mf_id, $ms_id, ~p_sk>),
+      !MerchantRegistered(<$ms_id, m_pk>),
+      Fr(~prepay_id)
+    ]
+    --[
+      Eq(veri_result, true), // Verify merchant signature
+      PS_Commit('PSAuthMS', $ps_id, $ms_id, <~order_id, amount, description>),
+      SOURCE_IN_FACT_M_SIGN_2('MS-PS', ~session, $ms_id, $ps_id, In_m)
+    ]->
+    [
+      SOut('MS-PS', ~session, $ps_id, $ms_id, ~prepay_id),
+      !PS_Database($ps_id, ~prepay_id, amount, description, ~order_id, uid),
+      PS_State('sendprepayid', ~session, <$ps_id, $u_id, $mf_id, $ms_id, ~p_sk>)
+    ]
+
+  rule MSSendPrepayidMF[role="MS"]:
+    let
+      amount = calc_amt(~goods)
+      description = gen_desc(~goods)
+      m_sig = sign(<~prepay_id, $ms_id>, ~m_sk)
+      Out_m = <~prepay_id, $ms_id, m_sig>
+    in
+    [
+      SIn('MS-PS', ~session, $ps_id, $ms_id, ~prepay_id),
+      MS_State('Sendupk', ~session, <$ms_id, $mf_id, $ps_id, $u_id, ~m_sk, ~order_id, ~goods>)
+    ]
+    --[
+        SOURCE_OUT_FACT_BkChaCon('MF-MS', ~session, $ms_id, $mf_id, Out_m),
+        SOURCE_OUT_FACT_M_SIGN('MF-MS', ~session, $ms_id, $mf_id, Out_m)
+    ]->
+    [
+      SOut('MF-MS', ~session, $ms_id, $mf_id, Out_m),
+      !MS_Database($ms_id, $u_id, ~prepay_id, amount, description, ~order_id),
+      MS_State('sendprepayid', ~session, <$ms_id, $mf_id, $ps_id, $u_id, ~m_sk>)
+    ]
+
+  // SCC: MF draws r, seals <T, r> to PS (T binds merchant, order handle and
+  // the user account u_id), shows code = f(r) to the user, and calls PS.
+  rule MFCallPS[role="MF"]:
+    let
+      In_m  = <~prepay_id, $ms_id, m_sig>
+      T     = h(<$ms_id, ~prepay_id, $u_id>)
+      seal  = aenc(<T, ~r>, p_pk)
+      Out_m = <~prepay_id, $ms_id, m_sig, seal>
+    in
+    [
+      SIn('MF-MS', ~session, $ms_id, $mf_id, In_m),
+      MF_State('ordered', ~session, <$mf_id, $u_id, $ms_id, $ps_id>),
+      !PS_PubKey(p_pk),
+      Fr(~r)
+    ]
+    --[
+      Finish('MF', ~session, $mf_id),
+      SOURCE_OUT_FACT_BkChaCon('MF-PS', ~session, $mf_id, $ps_id, Out_m),
+      SOURCE_IN_FACT_M_SIGN('MF-MS', ~session, $ms_id, $mf_id, In_m)
+    ]->
+    [
+      SOut('U-MF', ~session, $mf_id, $u_id, <'Code', f(~r)>),
+      SOut('MF-PS', ~session, $mf_id, $ps_id, Out_m),
+      MF_State('called', ~session, <$mf_id, $u_id, $ms_id, $ps_id>)
+    ]
+
+  // SCC: PS opens the seal only if the sealed T matches its own record
+  // (merchant, order handle, user account). The code is NOT shown.
+  rule PSVerifyPaymentMF[role="PS"]:
+    let
+      seal = aenc(<h(<$ms_id, ~prepay_id, uid>), r>, pk(~p_sk))
+      In_m = <~prepay_id, $ms_id, m_sig, seal>
+      veri_result_m = verify(m_sig, <~prepay_id, $ms_id>, m_pk)
+    in
+    [
+      SIn('MF-PS', ~session, $mf_id, $ps_id, In_m),
+      !PS_Database($ps_id, ~prepay_id, amount, description, ~order_id, uid),
+      PS_State('sendprepayid', ~session, <$ps_id, $u_id, $mf_id, $ms_id, ~p_sk>),
+      !MerchantRegistered(<$ms_id, m_pk>)
+    ]
+    --[
+      Eq(veri_result_m, true) // Verify merchant signature
+    ]->
+    [
+      SOut('U-PS', ~session, $ps_id, $u_id, <'SReqPwd', amount, description>),
+      PS_State('waitpwd', ~session, <$ps_id, $u_id, $mf_id, $ms_id, ~p_sk, ~prepay_id, ~order_id, amount, description, r>)
+    ]
+
+/*
+* ****************************************************************
+*   User Authentication & Authorization
+*   SCC: the user types the code shown by MF together with the password.
+* ****************************************************************
+*/
+  rule USubmitPasswordPS[role="U"]:
+    let
+      description = gen_desc(~goods)
+      amount = calc_amt(~goods)
+    in
+    [
+      U_State('ordered', ~session, <$u_id, $mf_id, $ms_id, $ps_id, ~password, ~goods>),
+      SIn('U-MF', ~session, $mf_id, $u_id, <'Code', code>),
+      SIn('U-PS', ~session, $ps_id, $u_id, <'SReqPwd', amount, description>),
+      !UserPassword(<$u_id, ~password>)
+    ]
+    --[
+      UserInputPwd($u_id, ~password, ~session)
+    ]->
+    [
+      SOut('U-PS', ~session, $u_id, $ps_id, <~password, code>),
+      U_State('pwdsubmitted', ~session, <$u_id, $mf_id, $ms_id, $ps_id, ~password, ~goods>)
+    ]
+
+  rule PSVerifyPasswordAndConfirmUMS[role="PS"]:
+    let
+      response = <~order_id, ~trade_id, amount>
+      res_sign = sign(response, ~p_sk)
+    in
+    [
+      SIn('U-PS', ~session, $u_id, $ps_id, <~password, code>),
+      PS_State('waitpwd', ~session, <$ps_id, $u_id, $mf_id, $ms_id, ~p_sk, ~prepay_id, ~order_id, amount, description, r>),
+      !UserRegistered(<$u_id, h(~password)>),
+      Fr(~trade_id),
+    ]
+    --[
+      Eq(code, f(r)), // SCC: typed code must match the sealed nonce
+      PS_Running('MSAuthPS', $ps_id, $ms_id, response),
+      PS_Running('UAuthPS',  $ps_id, $u_id, <amount, description>),
+      PaymentComplete($u_id, h(~password), ~session),
+      Finish('PS', ~session, $ps_id)
+    ]->
+    [
+      SOut('U-PS', ~session, $ps_id, $u_id, <'Successful', amount, description>),
+      SOut('MS-PS', ~session, $ps_id, $ms_id, <response, res_sign>),
+      PS_State('paysuccess', ~session, <$ps_id, $u_id, $mf_id, $ms_id, ~p_sk>)
+    ]
+
+/*
+* ****************************************************************
+*   Result Notification
+* ****************************************************************
+*/
+  rule MSReceiveNotification[role="MS"]:
+    let
+      response = <~order_id, ~trade_id, amount>
+      veri_result = verify(res_sign, response, p_pk)
+    in
+    [
+      !PS_PubKey(p_pk),
+      SIn('MS-PS', ~session, $ps_id, $ms_id, <response, res_sign>),
+      !MS_Database($ms_id, $user, ~prepay_id, amount, description, ~order_id),
+      MS_State('sendprepayid', ~session, <$ms_id, $mf_id, $ps_id, $u_id, ~m_sk>)
+    ]
+    --[
+      Eq(veri_result, true), // Verify PS signature
+      Finish('MS', ~session, $ms_id),
+      MS_Commit('MSAuthPS', $ms_id, $ps_id, response)
+    ]->
+    [
+      MS_State('completed', ~session, <$ms_id, $mf_id, $ps_id, $u_id, ~m_sk>)
+    ]
+
+  // SCC: the user's order agreement is committed when the payment it
+  // authorised is confirmed (the code check happens at PS, after submission).
+  rule UReceiveNotification[role="U"]:
+    let
+      description = gen_desc(~goods)
+      amount = calc_amt(~goods)
+    in
+    [
+      SIn('U-PS', ~session, $ps_id, $u_id, <'Successful', amount, description>),
+      U_State('pwdsubmitted', ~session, <$u_id, $mf_id, $ms_id, $ps_id, ~password, ~goods>)
+    ]
+    --[
+      Finish('U', ~session, $u_id),
+      U_Commit('UAuthMS', $u_id, $ms_id, ~goods),
+      U_Commit('UAuthPS', $u_id, $ps_id, <amount, description>)
+    ]->
+    [
+      U_State('completed', ~session, <$u_id, $mf_id, $ms_id, $ps_id, ~password, ~goods>)
+    ]
+
+
+/*
+* ****************************************************************
+*   Lemmas (identical to regular_order.spthy)
+* ****************************************************************
+*/
+
+  // Source Lemma
+  lemma typing [sources, heuristic={typing}]:
+    "
+      (All m1 m2 m3 m4 m5 #i. SOURCE_IN_FACT_BkChaCon(m1, m2, m3, m4, m5)@#i ==> (Ex #j. SOURCE_OUT_FACT_BkChaCon(m1, m2, m3, m4, m5)@#j & j < i) )
+      & (All m1 m2 m3 m4 m5 #i. SOURCE_IN_FACT_M_SIGN(m1, m2, m3, m4, m5)@#i ==> (Ex #j. SOURCE_OUT_FACT_M_SIGN(m1, m2, m3, m4, m5)@#j & j < i)
+                                                                            | (Ex #j. SOURCE_OUT_FACT_BkChaInt(m1, m2, m3, m4, m5)@#j & j < i) )
+      & (All m1 m2 m3 m4 m5 #i. SOURCE_IN_FACT_M_SIGN_2(m1, m2, m3, m4, m5)@#i ==> (Ex #j. SOURCE_OUT_FACT_M_SIGN_2(m1, m2, m3, m4, m5)@#j & j < i)
+                                                                            | (Ex #j. SOURCE_OUT_FACT_BkChaInt(m1, m2, m3, m4, m5)@#j & j < i) )
+    "
+
+  // General Lemmas
+  lemma executable [heuristic={default}]:
+    exists-trace
+    "
+      Ex session u_id mf_id ms_id ps_id #i #j #k #l #m.
+        Start(session, u_id, mf_id, ms_id, ps_id)@m
+        & Finish('U', session, u_id)@i
+        & Finish('MF', session, mf_id)@j
+        & Finish('MS', session, ms_id)@k
+        & Finish('PS', session, ps_id)@l
+    "
+
+  /* -------------------- L1 -------------------- */
+  lemma PS_MS_Order_Injective_Agreement [heuristic={default}]:
+    "
+    All ps ms o #i. PS_Commit('PSAuthMS', ps, ms, o)@i ==>
+      Ex #j. MS_Running('PSAuthMS', ms, ps, o)@j & j < i &
+      not (Ex ps2 ms2 #i2. PS_Commit('PSAuthMS', ps2, ms2, o)@i2 & not(#i2 = #i))
+    "
+
+  lemma U_MS_Order_Injective_Agreement [heuristic={default}]:
+    "
+    All u ms o #i. U_Commit('UAuthMS', u, ms, o)@i ==>
+      Ex #j. MS_Running('UAuthMS', ms, u, o)@j & j < i &
+      not (Ex u2 ms2 #i2. U_Commit('UAuthMS', u2, ms2, o)@i2 & not(#i2 = #i))
+    "
+
+  /* -------------------- L2 -------------------- */
+  lemma MS_PS_Response_Injective_Agreement [heuristic={default}]:
+    "
+    All ms ps r #i. MS_Commit('MSAuthPS', ms, ps, r)@i ==>
+      Ex #j. PS_Running('MSAuthPS', ps, ms, r)@j & j < i &
+      not (Ex ms2 ps2 #i2. MS_Commit('MSAuthPS', ms2, ps2, r)@i2 & not(#i2 = #i))
+    "
+
+  lemma U_PS_Response_Injective_Agreement [heuristic={default}]:
+    "
+    All u ps r #i. U_Commit('UAuthPS', u, ps, r)@i ==>
+      Ex #j. PS_Running('UAuthPS', ps, u, r)@j & j < i &
+      not (Ex u2 ps2 #i2. U_Commit('UAuthPS', u2, ps2, r)@i2 & not(#i2 = #i))
+    "
+
+  /* -------------------- L3 -------------------- */
+  lemma No_Payment_Without_Password_Input [heuristic={default}]:
+    "
+    All u p s #i. PaymentComplete(u, h(p), s)@i ==>
+      Ex #j. UserInputPwd(u, p, s)@j & j < i &
+      not (Ex u2 p2 #i2. PaymentComplete(u2, h(p2), s)@i2 & not(#i2 = #i))
+    "
+
+end

@@ -1,0 +1,43 @@
+model,case,time,lemma,type,result,steps
+control_commit_point/secure_ms_channel,alipay_app.spthy,11.86s,typing,all-traces,verified,27
+control_commit_point/secure_ms_channel,alipay_app.spthy,11.86s,executable,exists-trace,verified,36
+control_commit_point/secure_ms_channel,alipay_app.spthy,11.86s,PS_MS_Order_Injective_Agreement,all-traces,falsified - found trace,10
+control_commit_point/secure_ms_channel,alipay_app.spthy,11.86s,U_MS_Order_Injective_Agreement,all-traces,falsified - found trace,24
+control_commit_point/secure_ms_channel,alipay_app.spthy,11.86s,MS_PS_Response_Injective_Agreement,all-traces,verified,33
+control_commit_point/secure_ms_channel,alipay_app.spthy,11.86s,U_PS_Response_Injective_Agreement,all-traces,verified,104
+control_commit_point/secure_ms_channel,alipay_app.spthy,11.86s,No_Payment_Without_Password_Input,all-traces,verified,53
+control_commit_point/secure_ms_channel,alipay_mobile_web.spthy,12.24s,typing,all-traces,verified,27
+control_commit_point/secure_ms_channel,alipay_mobile_web.spthy,12.24s,executable,exists-trace,verified,36
+control_commit_point/secure_ms_channel,alipay_mobile_web.spthy,12.24s,PS_MS_Order_Injective_Agreement,all-traces,falsified - found trace,10
+control_commit_point/secure_ms_channel,alipay_mobile_web.spthy,12.24s,U_MS_Order_Injective_Agreement,all-traces,falsified - found trace,24
+control_commit_point/secure_ms_channel,alipay_mobile_web.spthy,12.24s,MS_PS_Response_Injective_Agreement,all-traces,verified,33
+control_commit_point/secure_ms_channel,alipay_mobile_web.spthy,12.24s,U_PS_Response_Injective_Agreement,all-traces,verified,104
+control_commit_point/secure_ms_channel,alipay_mobile_web.spthy,12.24s,No_Payment_Without_Password_Input,all-traces,verified,53
+control_commit_point/secure_ms_channel,alipay_order_code.spthy,24.29s,typing,all-traces,verified,39
+control_commit_point/secure_ms_channel,alipay_order_code.spthy,24.29s,executable,exists-trace,verified,42
+control_commit_point/secure_ms_channel,alipay_order_code.spthy,24.29s,PS_MS_Order_Injective_Agreement,all-traces,verified,9
+control_commit_point/secure_ms_channel,alipay_order_code.spthy,24.29s,U_MS_Order_Injective_Agreement,all-traces,falsified - found trace,36
+control_commit_point/secure_ms_channel,alipay_order_code.spthy,24.29s,MS_PS_Response_Injective_Agreement,all-traces,verified,219
+control_commit_point/secure_ms_channel,alipay_order_code.spthy,24.29s,U_PS_Response_Injective_Agreement,all-traces,verified,42
+control_commit_point/secure_ms_channel,alipay_order_code.spthy,24.29s,No_Payment_Without_Password_Input,all-traces,verified,11
+control_commit_point/secure_ms_channel,psp_b_pay_app.spthy,17.02s,typing,all-traces,verified,21
+control_commit_point/secure_ms_channel,psp_b_pay_app.spthy,17.02s,executable,exists-trace,verified,32
+control_commit_point/secure_ms_channel,psp_b_pay_app.spthy,17.02s,PS_MS_Order_Injective_Agreement,all-traces,verified,9
+control_commit_point/secure_ms_channel,psp_b_pay_app.spthy,17.02s,U_MS_Order_Injective_Agreement,all-traces,falsified - found trace,27
+control_commit_point/secure_ms_channel,psp_b_pay_app.spthy,17.02s,MS_PS_Response_Injective_Agreement,all-traces,verified,104
+control_commit_point/secure_ms_channel,psp_b_pay_app.spthy,17.02s,U_PS_Response_Injective_Agreement,all-traces,verified,102
+control_commit_point/secure_ms_channel,psp_b_pay_app.spthy,17.02s,No_Payment_Without_Password_Input,all-traces,verified,96
+control_commit_point/secure_ms_channel,psp_b_pay_h5.spthy,8.75s,typing,all-traces,verified,14
+control_commit_point/secure_ms_channel,psp_b_pay_h5.spthy,8.75s,executable,exists-trace,verified,32
+control_commit_point/secure_ms_channel,psp_b_pay_h5.spthy,8.75s,PS_MS_Order_Injective_Agreement,all-traces,verified,9
+control_commit_point/secure_ms_channel,psp_b_pay_h5.spthy,8.75s,U_MS_Order_Injective_Agreement,all-traces,falsified - found trace,23
+control_commit_point/secure_ms_channel,psp_b_pay_h5.spthy,8.75s,MS_PS_Response_Injective_Agreement,all-traces,verified,8
+control_commit_point/secure_ms_channel,psp_b_pay_h5.spthy,8.75s,U_PS_Response_Injective_Agreement,all-traces,verified,48
+control_commit_point/secure_ms_channel,psp_b_pay_h5.spthy,8.75s,No_Payment_Without_Password_Input,all-traces,verified,40
+control_commit_point/secure_ms_channel,psp_b_pay_native.spthy,7.95s,typing,all-traces,verified,14
+control_commit_point/secure_ms_channel,psp_b_pay_native.spthy,7.95s,executable,exists-trace,verified,32
+control_commit_point/secure_ms_channel,psp_b_pay_native.spthy,7.95s,PS_MS_Order_Injective_Agreement,all-traces,verified,9
+control_commit_point/secure_ms_channel,psp_b_pay_native.spthy,7.95s,U_MS_Order_Injective_Agreement,all-traces,falsified - found trace,19
+control_commit_point/secure_ms_channel,psp_b_pay_native.spthy,7.95s,MS_PS_Response_Injective_Agreement,all-traces,verified,8
+control_commit_point/secure_ms_channel,psp_b_pay_native.spthy,7.95s,U_PS_Response_Injective_Agreement,all-traces,verified,48
+control_commit_point/secure_ms_channel,psp_b_pay_native.spthy,7.95s,No_Payment_Without_Password_Input,all-traces,verified,40
